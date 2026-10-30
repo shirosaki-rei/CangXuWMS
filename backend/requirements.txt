@@ -1,0 +1,14 @@
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.32,<0.33
+sqlalchemy>=2.0,<2.1
+pymysql>=1.1,<1.2
+alembic>=1.14,<1.15
+pydantic>=2.9,<3
+pydantic-settings>=2.6,<3
+pyjwt>=2.10,<3
+bcrypt>=4.2,<5
+redis>=5.2,<6
+apscheduler>=3.11,<4
+httpx>=0.28,<0.29
+pytest>=8.3,<9
+cryptography>=44,<45

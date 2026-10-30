@@ -1,0 +1,120 @@
+# WMS 单机编排（架构第 10 章）。启动顺序：mysql → redis → api → worker → nginx。
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: wms-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootdev}
+      MYSQL_DATABASE: wms
+      MYSQL_USER: wms
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-wmsdev}
+      TZ: UTC
+    command: >
+      --innodb-buffer-pool-size=1G
+      --slow-query-log=1
+      --long-query-time=0.2
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_0900_ai_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./volumes/backup:/backup
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks: [wms-net]
+
+  redis:
+    image: redis:7-alpine
+    container_name: wms-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [wms-net]
+
+  # 一次性迁移 + 种子：建表并灌初始数据，跑完即退出
+  migrate:
+    build: ./backend
+    container_name: wms-migrate
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_URL: mysql+pymysql://${MYSQL_USER:-wms}:${MYSQL_PASSWORD:-wmsdev}@mysql:3306/wms?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+    command: >
+      sh -c "alembic upgrade head && python -m app.seed"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: "no"
+    networks: [wms-net]
+
+  api:
+    build: ./backend
+    container_name: wms-api
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_URL: mysql+pymysql://${MYSQL_USER:-wms}:${MYSQL_PASSWORD:-wmsdev}@mysql:3306/wms?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks: [wms-net]
+
+  worker:
+    build: ./backend
+    container_name: wms-worker
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_URL: mysql+pymysql://${MYSQL_USER:-wms}:${MYSQL_PASSWORD:-wmsdev}@mysql:3306/wms?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+    # B06 接入 APScheduler 前先占位，避免多个 worker 重复跑任务
+    command: ["python", "-c", "import time; print('worker idle (B06)'); time.sleep(3600)"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [wms-net]
+
+  nginx:
+    image: nginx:alpine
+    container_name: wms-nginx
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [wms-net]
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  wms-net:
+    driver: bridge

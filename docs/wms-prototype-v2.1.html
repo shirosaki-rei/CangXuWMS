@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WMS 仓储管理系统 · 高保真原型 V2.1（AI 增强）</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --blue:#1891ff;
+    --blue-d:#0d7ae0;
+    --line:#e5e5e5;
+    --thead:#f7f7f7;
+    --crumb:#eff7fa;
+    --text:#333;
+    --muted:#999;
+    --sub:#f5f5f5;
+  }
+  html,body{height:100%}
+  body{
+    font-family:"Microsoft YaHei","PingFang SC","Helvetica Neue",Arial,sans-serif;
+    background:#eceff3;color:var(--text);overflow:hidden;
+  }
+
+  /* ---------- 外壳 ---------- */
+  .shell{display:flex;height:100vh}
+  .tree{
+    width:236px;flex:0 0 236px;background:#fff;border-right:1px solid #dde2e8;
+    display:flex;flex-direction:column;
+  }
+  .tree-hd{
+    height:46px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 14px;border-bottom:1px solid #e8ecf1;font-size:12px;color:#666;
+    letter-spacing:.5px;
+  }
+  .tree-hd b{font-size:13px;color:#222;font-weight:600}
+  .tree-bd{flex:1;overflow:auto;padding:6px 0 30px}
+  .node{font-size:12px;color:#555;cursor:pointer;user-select:none}
+  .node.lv1{padding:7px 14px 7px 12px;font-weight:600;color:#333;display:flex;align-items:center;gap:6px}
+  .node.lv1:hover{background:#f7f9fb}
+  .node.lv2{padding:6px 14px 6px 34px;color:#666}
+  .node.lv2:hover{background:#f4f8fd;color:#1891ff}
+  .node.lv3{padding:5px 14px 5px 52px;color:#777}
+  .node.lv3:hover{background:#f4f8fd;color:#1891ff}
+  .node.active{background:#e8f3ff;color:var(--blue);font-weight:600}
+  .node .tri{font-size:9px;color:#aaa;transition:transform .15s;display:inline-block;width:10px}
+  .node.closed .tri{transform:rotate(-90deg)}
+  .grp-body.hide{display:none}
+
+  .stage{flex:1;display:flex;flex-direction:column;min-width:0}
+  .stage-hd{
+    height:46px;flex:0 0 46px;background:#fff;border-bottom:1px solid #dde2e8;
+    display:flex;align-items:center;justify-content:space-between;padding:0 18px;
+  }
+  .stage-hd .t{font-size:13px;color:#333;font-weight:600}
+  .stage-hd .t span{font-weight:400;color:#9aa4af;margin-left:8px;font-size:12px}
+  .stage-hd .hint{font-size:11px;color:#a6b0ba}
+  .stage-bd{flex:1;overflow:auto;padding:22px;display:flex;justify-content:center;align-items:flex-start}
+
+  /* ---------- PC 画布 ---------- */
+  .pc{width:1280px;max-width:100%;min-width:0;background:#fff;box-shadow:0 6px 28px rgba(28,50,80,.14);flex:0 1 auto}
+  .topbar{
+    height:66px;display:flex;align-items:center;color:#fff;
+    background:linear-gradient(90deg,#0b76dc 0%,#1687f5 10%,#1891ff 100%);
+  }
+  .logo{
+    width:140px;flex:0 0 140px;padding-left:16px;font-size:17px;font-weight:700;
+    letter-spacing:.3px;white-space:nowrap;
+  }
+  .mainnav{display:flex;align-items:center;height:100%;font-size:13px}
+  .mainnav a{
+    color:#fff;text-decoration:none;padding:0 15px;height:100%;display:flex;align-items:center;white-space:nowrap;
+    opacity:.95;cursor:pointer;white-space:nowrap;
+  }
+  .mainnav a:hover{opacity:1;background:rgba(255,255,255,.12)}
+  .mainnav a.on{background:rgba(255,255,255,.18);font-weight:600;opacity:1}
+  .topbar .right{margin-left:auto;display:flex;align-items:center;gap:12px;padding-right:16px;font-size:12px;opacity:.95;flex:0 0 auto;white-space:nowrap}
+  .avatar{width:26px;height:26px;border-radius:50%;background:#fff;color:var(--blue);display:grid;place-items:center;font-size:11px;font-weight:700}
+
+  .pc-body{display:flex;min-height:820px}
+  .subnav{
+    width:150px;flex:0 0 150px;border-right:1px solid #e8e8e8;background:#fff;padding-top:2px;
+  }
+  .subnav a{
+    display:block;font-size:12.5px;color:#555;text-decoration:none;padding:13px 16px;
+    border-bottom:1px solid #f2f2f2;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .subnav a:hover{background:#f2f8ff;color:var(--blue)}
+  .subnav a.on{background:var(--sub);color:#333;font-weight:600}
+  .content{flex:1;min-width:0;display:flex;flex-direction:column;background:#fff}
+  .crumbbar{
+    height:40px;flex:0 0 40px;background:var(--crumb);display:flex;align-items:center;
+    padding:0 22px;font-size:12px;color:#7b8a99;gap:6px;
+  }
+  .crumbbar .sep{color:#b8c4cf;margin:0 2px}
+  .crumbbar .cur{color:var(--blue)}
+  .page{padding:26px 22px 40px;flex:1}
+
+  /* ---------- 搜索区 ---------- */
+  .filters{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+  .field{
+    width:190px;height:40px;border:1px solid #e2e2e2;border-radius:3px;background:#fff;
+    font-size:12px;color:#333;padding:0 10px;font-family:inherit;text-align:center;
+  }
+  .field::placeholder{color:#b9b9b9}
+  .field:focus{outline:none;border-color:var(--blue)}
+  .field.date{text-align:left;color:#b9b9b9;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+  .btn{
+    height:36px;padding:0 20px;border:0;border-radius:3px;background:var(--blue);color:#fff;
+    font-size:12px;cursor:pointer;font-family:inherit;
+  }
+  .btn:hover{background:#0c84f0}
+  .btn + .btn{margin-left:10px}
+
+  /* ---------- 表格 ---------- */
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  th{
+    background:var(--thead);font-weight:400;font-size:12px;color:#333;height:40px;
+    border:1px solid var(--line);padding:6px 8px;
+  }
+  td{
+    border:1px solid var(--line);font-size:12px;color:#555;text-align:center;
+    padding:10px 8px;line-height:1.6;word-break:break-word;
+  }
+  tbody tr:hover td{background:#fafcff}
+  td.l{text-align:left}
+  .link{color:var(--blue);cursor:pointer;font-size:12px}
+  .link:hover{text-decoration:underline}
+  .ops{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;line-height:1.5}
+  .num-neg{color:#e5484d}
+  .spec{font-size:11px;color:#777;text-align:left;line-height:1.75}
+
+  .pager{
+    display:flex;align-items:center;justify-content:flex-end;gap:8px;
+    margin-top:18px;font-size:12px;color:#666;
+  }
+  .pg{
+    min-width:22px;height:22px;border:1px solid #ddd;border-radius:3px;display:grid;place-items:center;
+    font-size:11px;color:#666;cursor:pointer;padding:0 5px;background:#fff;
+  }
+  .pg:hover{border-color:var(--blue);color:var(--blue)}
+  .pg.on{background:var(--blue);border-color:var(--blue);color:#fff}
+
+  /* ---------- 注释框 ---------- */
+  .note{
+    margin-top:26px;background:#e6f4fd;border-left:3px solid var(--blue);border-radius:4px;
+    padding:16px 18px;font-size:12px;color:#2b5570;line-height:1.95;
+  }
+  .note b{display:block;margin-bottom:4px;color:#17496b;font-size:12.5px}
+
+  /* ---------- 详情页 ---------- */
+  .detail-hd{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+  .back{
+    width:24px;height:24px;display:grid;place-items:center;cursor:pointer;color:#333;font-size:16px;
+  }
+  .back:hover{color:var(--blue)}
+  .detail-hd h2{font-size:15px;font-weight:700;color:#222}
+  .panel{
+    border:1px solid #eef1f4;background:#fff;padding:22px 26px 26px;margin-bottom:20px;
+  }
+  .panel-title{
+    position:relative;padding-left:11px;font-size:13.5px;font-weight:700;color:#222;margin-bottom:20px;
+  }
+  .panel-title::before{
+    content:"";position:absolute;left:0;top:1px;width:3px;height:14px;background:var(--blue);border-radius:1px;
+  }
+  .kv{display:grid;grid-template-columns:repeat(4,1fr);gap:18px 16px}
+  .kv .item{font-size:12px;display:flex;gap:6px;min-width:0}
+  .kv .k{color:#7d8792;flex:0 0 auto}
+  .kv .v{color:#222;font-weight:500;word-break:break-all}
+  .panel table{margin-top:4px}
+  .stamp{color:#e5484d}
+
+  /* ---------- 登录 ---------- */
+  .login-wrap{width:1280px;max-width:100%;height:760px;background:#fff;display:grid;place-items:center;box-shadow:0 6px 28px rgba(28,50,80,.14)}
+  .login-card{display:flex;width:760px;max-width:100%;height:470px;background:#fff;box-shadow:0 4px 30px rgba(30,80,140,.12);border-radius:4px;overflow:hidden}
+  .login-left{
+    width:340px;background:#e9f3fd;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:36px 26px;
+  }
+  .login-left h3{font-size:17px;font-weight:700;color:#2b4a63;letter-spacing:.5px}
+  .login-left p{font-size:10.5px;color:#7f9cb4;margin-top:6px;letter-spacing:.2px}
+  .login-art{margin-top:34px;width:250px;height:170px;position:relative}
+  .login-right{flex:1;padding:46px 42px}
+  .login-right h4{font-size:13.5px;font-weight:700;color:#222}
+  .login-right h4 span{font-weight:400;font-size:11px;color:#9aa4af}
+  .login-form{margin-top:26px}
+  .login-form input{
+    width:100%;height:42px;border:1px solid #e4e4e4;border-radius:3px;padding:0 14px;
+    font-size:12px;font-family:inherit;margin-bottom:14px;color:#333;
+  }
+  .login-form input::placeholder{color:#bbb}
+  .login-form input:focus{outline:none;border-color:var(--blue)}
+  .captcha-row{display:flex;gap:10px}
+  .captcha-row input{margin-bottom:0;flex:1}
+  .captcha-box{
+    width:82px;height:42px;border:1px solid #e4e4e4;border-radius:3px;display:grid;place-items:center;
+    font-size:16px;font-style:italic;letter-spacing:1px;color:#4b5b6a;font-family:Georgia,serif;
+    background:linear-gradient(120deg,#fdfdfd,#f1f4f7);user-select:none;
+  }
+  .login-row{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:#7b8794;margin:16px 0 20px}
+  .login-row label{display:flex;align-items:center;gap:6px;cursor:pointer}
+  .login-row a{color:var(--blue);text-decoration:none}
+  .login-submit{
+    width:100%;height:44px;border:0;border-radius:3px;background:var(--blue);color:#fff;
+    font-size:14px;letter-spacing:2px;cursor:pointer;font-family:inherit;
+  }
+  .login-submit:hover{background:#0c84f0}
+
+  /* ---------- APP ---------- */
+  .phone{
+    width:375px;height:760px;background:#fff;border-radius:26px;position:relative;
+    box-shadow:0 10px 36px rgba(28,50,80,.18);overflow:hidden;display:flex;flex-direction:column;
+    border:1px solid #e2e6ea;
+  }
+  .status{
+    height:34px;flex:0 0 34px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 20px;font-size:11px;font-weight:600;color:#111;
+  }
+  .app-hd{
+    height:48px;flex:0 0 48px;display:flex;align-items:center;justify-content:center;position:relative;
+    font-size:15px;font-weight:600;color:#222;border-bottom:1px solid #f0f0f0;
+  }
+  .app-hd .l{position:absolute;left:14px;font-size:18px;color:#333;cursor:pointer;line-height:1}
+  .app-hd .r{position:absolute;right:14px;font-size:12px;color:var(--blue);font-weight:400}
+  .app-body{flex:1;overflow:auto;padding:18px 16px 20px;background:#fff}
+  .app-grp{margin-bottom:22px}
+  .app-grp h5{font-size:13.5px;font-weight:700;color:#1d2b38;margin-bottom:14px}
+  .app-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 8px}
+  .app-grid .cell{display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer}
+  .app-grid .cell:hover .ic{background:#e6f2fe}
+  .ic{
+    width:44px;height:44px;border-radius:10px;background:#f4f8fc;display:grid;place-items:center;
+    transition:background .15s;
+  }
+  .ic svg{width:24px;height:24px;stroke:var(--blue);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .app-grid .cell span{font-size:11px;color:#3c4a57;text-align:center;line-height:1.3}
+  .tabbar{
+    height:54px;flex:0 0 54px;border-top:1px solid #eee;display:flex;background:#fff;
+  }
+  .tabbar div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;color:#9aa4af}
+  .tabbar div.on{color:var(--blue)}
+  .tabbar svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .app-card{
+    border:1px solid #eef1f4;border-radius:6px;padding:14px 14px 10px;margin-bottom:12px;background:#fff;
+  }
+  .app-card .hd{display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid #f2f4f6;margin-bottom:10px}
+  .app-card .hd b{font-size:12.5px;color:#1d2b38}
+  .app-card .hd i{font-style:normal;font-size:11px;color:var(--blue)}
+  .app-card .row{display:flex;font-size:12px;color:#5b6874;line-height:2.05}
+  .app-card .row .k{color:#8b96a2;width:74px;flex:0 0 74px}
+  .app-card .row .v{color:#22303c}
+  .app-meta{display:flex;gap:18px;font-size:11.5px;color:#7b8794;margin-top:10px;padding-top:10px;border-top:1px solid #f2f4f6;align-items:center}
+  .app-meta .m{display:flex;align-items:center;gap:5px}
+  .app-meta svg{width:14px;height:14px;stroke:#9aa4af;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+  /* ---------- AI 建议层 ---------- */
+  .ai-tag{
+    display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;
+    color:#0b6ed6;background:#e8f2ff;border-radius:3px;padding:2px 7px;letter-spacing:.3px;
+  }
+  .ai-tag::before{content:"";width:5px;height:5px;border-radius:50%;background:#1891ff;box-shadow:0 0 0 3px rgba(24,145,255,.15)}
+  .ai-card{
+    border:1px solid #d3e6fa;border-radius:10px;
+    background:linear-gradient(180deg,#fafdff 0%,#fff 55%);
+    box-shadow:0 6px 20px rgba(24,145,255,.10);padding:16px 18px;
+  }
+  .ai-card .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px}
+  .ai-card .hl{font-size:13.5px;font-weight:700;color:#12324a}
+  .conf{font-size:10.5px;font-weight:600;color:#12854a;background:#e6f8ef;border-radius:20px;padding:3px 9px;white-space:nowrap}
+  .conf.mid{color:#a8730f;background:#fdf4e3}
+  .loc-big{
+    font-size:30px;font-weight:800;color:#0b6ed6;letter-spacing:1.5px;line-height:1.1;
+    font-family:"DIN Alternate","Bahnschrift",Arial,sans-serif;
+  }
+  .loc-sub{font-size:11.5px;color:#8494a3;margin-top:5px}
+  .reasons{list-style:none;margin:12px 0 16px;display:flex;flex-direction:column;gap:7px}
+  .reasons li{font-size:12px;color:#42566a;line-height:1.6;display:flex;gap:8px;align-items:flex-start}
+  .reasons li::before{content:"";width:4px;height:4px;border-radius:50%;background:#1891ff;margin-top:7px;flex:0 0 4px}
+  .ai-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .ai-btn{
+    height:34px;padding:0 16px;border-radius:6px;font-size:12.5px;border:1px solid #d3e6fa;
+    background:#fff;color:#0b6ed6;cursor:pointer;font-family:inherit;
+  }
+  .ai-btn:hover{background:#f2f8ff}
+  .ai-btn.primary{background:#1891ff;border-color:#1891ff;color:#fff}
+  .ai-btn.primary:hover{background:#0c84f0}
+  .ai-btn.ghost{border-color:#e6e9ed;color:#8b96a2}
+  .ai-foot{font-size:11px;color:#9aa8b5;margin-top:12px;line-height:1.7}
+
+  .check{border:1px solid #e6ebf1;border-radius:10px;overflow:hidden;background:#fff}
+  .check-hd{padding:14px 20px;background:#f7fafd;border-bottom:1px solid #eef2f6;display:flex;align-items:center;justify-content:space-between}
+  .check-hd b{font-size:13px;color:#1d2b38}
+  .check-hd .sum{font-size:12px;color:#5b6874}
+  .check-hd .sum i{font-style:normal;color:#12854a;font-weight:600}
+  .check-hd .sum u{text-decoration:none;color:#c08a12;font-weight:600}
+  .check-item{display:flex;gap:12px;padding:15px 20px;border-bottom:1px solid #f2f5f8;font-size:12px;align-items:flex-start}
+  .check-item:last-child{border-bottom:0}
+  .check-item .ico{width:16px;flex:0 0 16px;font-size:13px;line-height:1.5;text-align:center}
+  .check-item .body{flex:1;min-width:0}
+  .check-item .row1{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .check-item .row1 b{font-size:12.5px;color:#1d2b38;font-weight:600}
+  .check-item .code{font-size:10.5px;color:#93a1ae;background:#f4f6f8;border-radius:3px;padding:1px 5px}
+  .check-item .desc{color:#6b7a88;line-height:1.75}
+  .check-item .act{margin-top:7px;display:flex;gap:14px}
+  .ico.ok{color:#17a34a}.ico.warn{color:#e0a417}.ico.block{color:#e5484d}
+  .check-ft{padding:14px 20px;background:#fcfdfe;border-top:1px solid #f2f5f8;display:flex;justify-content:flex-end;gap:10px}
+
+  .ask-wrap{max-width:880px;margin:0 auto}
+  .ask-hd{margin-bottom:22px}
+  .ask-hd h1{font-size:19px;font-weight:700;color:#16283a;letter-spacing:.5px}
+  .ask-hd p{font-size:12.5px;color:#8b96a2;margin-top:6px}
+  .ask-box{
+    display:flex;align-items:center;gap:12px;border:1px solid #d3e6fa;border-radius:10px;
+    padding:0 8px 0 18px;height:54px;background:#fff;box-shadow:0 4px 16px rgba(24,145,255,.08);
+  }
+  .ask-box input{flex:1;border:0;outline:none;font-size:14px;color:#1d2b38;font-family:inherit;background:transparent}
+  .ask-box input::placeholder{color:#b0bcc8}
+  .ask-send{height:38px;padding:0 20px;border:0;border-radius:7px;background:#1891ff;color:#fff;font-size:13px;cursor:pointer;font-family:inherit}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .chip{font-size:12px;padding:7px 13px;border:1px solid #e6ebf1;border-radius:16px;color:#5b6874;background:#fff;cursor:pointer}
+  .chip:hover{border-color:#bcdcfb;color:#0b6ed6;background:#f7fbff}
+  .answer{margin-top:26px;border:1px solid #e6ebf1;border-radius:12px;background:#fff;box-shadow:0 4px 18px rgba(28,50,80,.06);overflow:hidden}
+  .answer-hd{padding:18px 22px 0;display:flex;align-items:center;gap:8px;font-size:12px;color:#8b96a2}
+  .concl{padding:10px 22px 18px;font-size:16px;color:#16283a;line-height:1.7;font-weight:600}
+  .concl em{font-style:normal;color:#0b6ed6;font-size:20px;font-weight:800;padding:0 2px}
+  .chart{padding:6px 22px 18px}
+  .bars{display:flex;align-items:flex-end;gap:26px;height:150px;padding:0 4px;border-bottom:1px solid #eef2f6}
+  .bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px}
+  .bar i{display:block;width:100%;max-width:36px;background:linear-gradient(180deg,#5db4ff,#1891ff);border-radius:4px 4px 0 0}
+  .bar span{font-size:10.5px;color:#93a1ae}
+  .bar b{font-size:10.5px;color:#5b6874;font-weight:600}
+  .answer-tb{padding:0 22px 8px}
+  .answer-tb table{font-size:12px}
+  .answer-tb th{height:34px;background:#fafcfd}
+  .answer-tb td{height:36px;padding:6px 8px}
+  .caliber{padding:12px 22px 16px;font-size:11.5px;color:#8b96a2;line-height:1.9;border-top:1px dashed #eef2f6}
+  .caliber b{color:#5b6874;font-weight:600}
+  .answer-ft{padding:12px 22px;background:#fbfcfe;border-top:1px solid #f2f5f8;display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:#9aa8b5}
+  .answer-ft .ops{display:flex;gap:16px}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  .kpi{border:1px solid #eef1f4;border-radius:10px;padding:18px 20px;background:#fff}
+  .kpi .k{font-size:12px;color:#8b96a2}
+  .kpi .v{font-size:26px;font-weight:800;color:#16283a;margin:8px 0 4px;letter-spacing:.5px}
+  .kpi .d{font-size:11px;color:#17a34a}
+  .kpi .d.warn{color:#c08a12}
+  .hbar .row{display:grid;grid-template-columns:104px 1fr 48px;align-items:center;gap:12px;font-size:12px;color:#5b6874;margin-bottom:14px}
+  .hbar .row .nm{color:#42566a;font-size:11.5px}
+  .hbar .row .track{display:block;flex:1;height:8px;background:#f1f5f9;border-radius:6px;overflow:hidden}
+  .hbar .row .fill{display:block;height:100%;background:linear-gradient(90deg,#7cc3ff,#1891ff);border-radius:6px}
+  .hbar .row .pct{font-weight:700;color:#16283a;font-size:12px;text-align:right}
+
+  .ctabs{display:flex;align-items:center;gap:8px;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid #eef2f6;flex-wrap:wrap}
+  .ctab{font-size:12.5px;color:#5b6874;padding:7px 14px;border:1px solid #e6ebf1;border-radius:6px;cursor:pointer;background:#fff;user-select:none}
+  .ctab:hover{border-color:#bcdcfb;color:#0b6ed6}
+  .ctab.on{background:#1891ff;border-color:#1891ff;color:#fff;font-weight:600}
+  .ctab i{font-style:normal;font-size:10.5px;background:rgba(31,58,88,.10);border-radius:8px;padding:0 5px;margin-left:4px}
+  .ctab.on i{background:rgba(255,255,255,.26)}
+  .ctab-tip{margin-left:auto;font-size:11.5px;color:#9aa8b5}
+
+  .phone .ai-card{padding:13px 14px}
+  .phone .loc-big{font-size:24px}
+  .phone .reasons li{font-size:11.5px}
+  .phone .ai-btn{height:32px;padding:0 12px;font-size:12px}
+  .phone .ai-card .hl{font-size:12.5px}
+
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="tree">
+    <div class="tree-hd"><b>WMS 原型 V2.1</b><span id="pcount"></span></div>
+    <div class="tree-bd" id="tree"></div>
+  </aside>
+  <main class="stage">
+    <div class="stage-hd">
+      <div class="t" id="stageTitle"></div>
+      <div class="hint">← → 切换页面</div>
+    </div>
+    <div class="stage-bd" id="stageBody"></div>
+  </main>
+</div>
+
+<script>
+/* =========================================================
+   工具
+   ========================================================= */
+const $ = s => document.querySelector(s);
+
+const PATHS = {
+  in: '<path d="M12 3v9"/><path d="m8 8.5 4 4 4-4"/><path d="M4 15v3.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V15"/>',
+  out: '<path d="M12 12.5V3"/><path d="m8 7 4-4 4 4"/><path d="M4 15v3.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V15"/>',
+  doc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+  box: '<path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5v-9Z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/>',
+  check: '<path d="M4 12.5 9 17.5 20 6.5"/>',
+  home: '<path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1v-9.5Z"/>',
+  user: '<circle cx="12" cy="8" r="3.4"/><path d="M5 20c1.2-3.6 3.8-5.2 7-5.2s5.8 1.6 7 5.2"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/>',
+  truck: '<path d="M3 7h10v9H3z"/><path d="M13 10h4l4 3.5V16h-8"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',
+  scan: '<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5A1.5 1.5 0 0 1 18.5 20H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M4 12h16"/>'
+};
+const svg = n => `<svg viewBox="0 0 24 24">${PATHS[n] || PATHS.box}</svg>`;
+
+/* =========================================================
+   导航结构
+   ========================================================= */
+const NAV = [
+  { label:'实时库存查询', items:['成品库存明细','物料库存明细'] },
+  { label:'出入库查询', items:['产品出入库查询','物料出入库查询'] },
+  { label:'入库管理', items:['产品入库','采购入库','生产退料','盘盈入库','入库详情'] },
+  { label:'出库管理', items:['销售出库','领料出库','盘亏出库','出库详情'] },
+  { label:'库内作业管理', items:['来料检验','物料盘点','盘点详情','物料移位'] },
+  { label:'基础设置', items:['仓库管理','库位管理','条码管理'] },
+  { label:'AI 建议层', items:['智能问数','库位推荐（APP）','拣货路径（APP）','提交前校验','AI 效果看板'] },
+  { label:'仓储APP端', items:['APP 主页','APP 产品入库','APP 产品入库详情','APP 采购入库','APP 来料验收','APP 入库作业','APP 出库作业','拣货路径（APP）','APP 库内作业'] }
+];
+
+/* =========================================================
+   组件
+   ========================================================= */
+function topbar(group){
+  const nav = NAV.map((g,i)=>{
+    if (g.label === '仓储APP端'){
+      return `<a class="${group===i?'on':''}" data-app="APP 主页" style="margin-left:38px">仓储APP端</a>`;
+    }
+    return `<a class="${group===i?'on':''}" data-group="${i}">${g.label}</a>`;
+  }).join('');
+  return `<header class="topbar">
+    <div class="logo">WMS管理系统</div>
+    <nav class="mainnav">${nav}</nav>
+    <div class="right"><div class="avatar">王</div></div>
+  </header>`;
+}
+function subnav(group, cur){
+  const g = NAV[group];
+  return `<aside class="subnav">${g.items.map(it=>`<a class="${it===cur?'on':''}" data-page="${it}">${it}</a>`).join('')}</aside>`;
+}
+function crumb(parts){
+  return `<div class="crumbbar">${parts.map((p,i)=>
+    i===parts.length-1 ? `<span class="cur">${p}</span>` : `<span>${p}</span><span class="sep">/</span>`
+  ).join('')}</div>`;
+}
+function pager(){
+  return `<div class="pager"><span>总共 85 个项目</span>
+    <span class="pg">‹</span>
+    <span class="pg on">1</span><span class="pg">2</span><span class="pg">3</span><span class="pg">4</span><span class="pg">5</span>
+    <span class="pg">›</span></div>`;
+}
+/* 列宽归一化：保证 fixed 布局下铺满整行 */
+function norm(cols){
+  const total = cols.reduce((s,c)=>s + parseFloat(c[1]), 0);
+  if (!total) return cols;
+  const out = cols.map(c=>[c[0], (parseFloat(c[1]) / total * 100).toFixed(2) + '%']);
+  return out;
+}
+function note(title, lines){
+  return `<div class="note"><b>${title}</b>${lines.map(l=>`<div>${l}</div>`).join('')}</div>`;
+}
+
+/* 通用列表页 */
+function listPage(cfg){
+  const filters = cfg.filters.map(f=>{
+    if (f.type === 'date') return `<div class="field date"><span>${f.ph}</span><span>▯</span></div>`;
+    if (f.type === 'select') return `<div class="field date"><span>${f.ph}</span><span>▾</span></div>`;
+    return `<input class="field" placeholder="${f.ph}">`;
+  }).join('');
+  const actions = `<button class="btn">${cfg.btn || '查询'}</button>` +
+    (cfg.actions||[]).map(a=>`<button class="btn">${a}</button>`).join('');
+
+  const head = norm(cfg.cols).map(c=>`<th style="width:${c[1]}">${c[0]}</th>`).join('');
+  const body = cfg.rows.map(r=>`<tr>${r.map(cell=>{
+    if (cell && cell.t === 'link') return `<td><div class="ops">${cell.v.map(x=>`<span class="link">${x}</span>`).join('')}</div></td>`;
+    if (cell && cell.t === 'neg') return `<td><span class="num-neg">${cell.v}</span></td>`;
+    if (cell && cell.t === 'spec') return `<td><div class="spec">${cell.v}</div></td>`;
+    if (cell && cell.t === 'tag') return `<td><span style="color:${cell.c}">${cell.v}</span></td>`;
+    if (cell && cell.t === 'switch')
+      return `<td><span style="display:inline-block;width:38px;height:20px;border-radius:12px;background:${cell.on?'#1891ff':'#d7dde3'};position:relative"><i style="position:absolute;top:2px;${cell.on?'right:2px':'left:2px'};width:16px;height:16px;border-radius:50%;background:#fff;display:block"></i></span></td>`;
+    return `<td>${cell ?? ''}</td>`;
+  }).join('')}</tr>`).join('');
+
+  return `<div class="pc">
+    ${topbar(cfg.group)}
+    <div class="pc-body">
+      ${subnav(cfg.group, cfg.sub)}
+      <section class="content">
+        ${crumb(cfg.crumb)}
+        <div class="page">
+          <div class="filters">${filters}${actions}</div>
+          <table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+          ${pager()}
+          ${cfg.note || ''}
+        </div>
+      </section>
+    </div>
+  </div>`;
+}
+
+/* 详情页 */
+function detailPage(cfg){
+  const secs = cfg.sections.map(s=>{
+    let inner = '';
+    if (s.kv){
+      inner = `<div class="kv">${s.kv.map(([k,v])=>{
+        const isStamp = String(v).includes('待') || String(v).includes('未');
+        return `<div class="item"><span class="k">${k}：</span><span class="v" ${isStamp?'style="color:#1891ff"':''}>${v}</span></div>`;
+      }).join('')}</div>`;
+    }
+    if (s.table){
+      const head = norm(s.table.cols).map(c=>`<th style="width:${c[1]}">${c[0]}</th>`).join('');
+      const body = s.table.rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');
+      inner = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+    }
+    return `<div class="panel"><div class="panel-title">${s.title}${s.badge?`<span class="ai-tag" style="margin-left:8px;vertical-align:1px">${s.badge}</span>`:''}</div>${inner}</div>`;
+  }).join('');
+
+  const act = cfg.action ? `<div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+      ${cfg.action.hint?`<span style="font-size:11.5px;color:#9aa8b5">${cfg.action.hint}</span>`:''}
+      <button class="btn" data-page="${cfg.action.to}">${cfg.action.text}</button>
+    </div>` : '';
+
+  return `<div class="pc">
+    ${topbar(cfg.group)}
+    <div class="pc-body">
+      ${subnav(cfg.group, cfg.sub)}
+      <section class="content">
+        ${crumb(cfg.crumb)}
+        <div class="page">
+          <div class="detail-hd"><span class="back" data-page="${cfg.backTo||''}">←</span><h2>${cfg.title}</h2>${act}</div>
+          ${secs}
+        </div>
+      </section>
+    </div>
+  </div>`;
+}
+
+/* =========================================================
+   数据
+   ========================================================= */
+const PHONE_SPEC = '机身尺寸：147.6×71.6×7.8mm，重 170g；<br>屏幕：6.1 英寸超视网膜 XDR OLED；<br>分辨率 2556×1179，60Hz 刷新率；<br>峰值亮度达 2000nit，支持灵动岛交互与 P3 广色域';
+
+/* =========================================================
+   页面定义
+   ========================================================= */
+const PAGES = {};
+
+/* ---------- 登录 ---------- */
+PAGES['登录页面'] = {
+  group:-1, app:false,
+  render(){
+    return `<div class="login-wrap" style="background:#f5f7fa">
+      <div class="login-card">
+        <div class="login-left">
+          <h3>仓储管理系统</h3>
+          <p>Information System Platform</p>
+          <div class="login-art">
+            <svg viewBox="0 0 250 170">
+              <rect x="52" y="30" width="150" height="86" rx="8" fill="#fff" stroke="#bcd8f2" stroke-width="1.6"/>
+              <rect x="62" y="52" width="42" height="30" rx="2" fill="#e3effb"/>
+              <rect x="72" y="44" width="7" height="38" rx="2" fill="#6fb4ee"/>
+              <rect x="83" y="58" width="7" height="24" rx="2" fill="#6fb4ee"/>
+              <rect x="94" y="50" width="7" height="32" rx="2" fill="#6fb4ee"/>
+              <path d="M64 96 L88 80 L108 90 L132 66 L152 74 L176 56" fill="none" stroke="#f2705d" stroke-width="2.2" stroke-linecap="round"/>
+              <rect x="160" y="46" width="34" height="22" rx="2" fill="#dbeaf8"/>
+              <circle cx="186" cy="92" r="7" fill="#f8d9a0" stroke="#e2b877"/>
+              <path d="M72 170 C72 140 86 122 104 122 C120 122 128 138 128 152 L128 170" fill="#2f4a63"/>
+              <circle cx="104" cy="112" r="9" fill="#f6c9a0"/>
+              <path d="M92 112 a12 12 0 0 1 24 0" fill="#243c52"/>
+              <path d="M150 170 C150 148 162 132 178 132 C194 132 202 146 202 160 L202 170" fill="#3b7fb5"/>
+              <circle cx="178" cy="122" r="9" fill="#f6c9a0"/>
+              <path d="M166 122 a12 12 0 0 1 24 0" fill="#243c52"/>
+              <rect x="42" y="146" width="20" height="18" rx="3" fill="#cfe3f6"/>
+              <path d="M46 146 C46 134 54 130 54 130 C54 130 62 134 62 146" fill="#7bb3e0"/>
+              <rect x="208" y="150" width="18" height="16" rx="3" fill="#cfe3f6"/>
+              <path d="M211 150 C211 140 217 136 217 136 C217 136 223 140 223 150" fill="#7bb3e0"/>
+            </svg>
+          </div>
+        </div>
+        <div class="login-right">
+          <h4>用户登录 <span>（账号：axure；密码：12345678）</span></h4>
+          <div class="login-form">
+            <input placeholder="请输入用户名称">
+            <input type="password" placeholder="请输入登录密码">
+            <div class="captcha-row">
+              <input placeholder="请输入右侧校验码">
+              <div class="captcha-box">pOvh</div>
+            </div>
+            <div class="login-row">
+              <label><span style="width:12px;height:12px;border:1px solid #cfd6dd;border-radius:2px;display:inline-block"></span>记住密码</label>
+              <a href="javascript:">忘记密码？</a>
+            </div>
+            <button class="login-submit" data-page="成品库存明细">登录</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+};
+
+/* ---------- 库存明细 ---------- */
+PAGES['成品库存明细'] = { group:0, render:()=>listPage({
+  group:0, sub:'成品库存明细', crumb:['系统','成品库存明细'],
+  filters:[{ph:'产品名称'},{ph:'产品编码'},{ph:'更新日期',type:'date'}],
+  cols:[['产品编码','12%'],['产品名称','14%'],['规格型号','34%'],['产品数量','10%'],['产品单位','10%'],['最新入库日期','12%']],
+  rows:[
+    ['A3288','iphone16',{t:'spec',v:PHONE_SPEC},'100','台','2026-01-27'],
+    ['A3289','iPhone 16 Plus',{t:'spec',v:PHONE_SPEC},'100','台','2026-01-27']
+  ]
+})};
+
+PAGES['物料库存明细'] = { group:0, render:()=>listPage({
+  group:0, sub:'物料库存明细', crumb:['系统','物料库存明细'],
+  filters:[{ph:'物料名称'},{ph:'物料编码'},{ph:'更新日期',type:'date'}],
+  cols:[['物料编码','15%'],['物料名称','30%'],['物料类型','10%'],['单位','7%'],['总库存数量','9%'],['当前可用库存','10%'],['在途库存','8%'],['安全库存','8%']],
+  rows:[
+    ['BAT-LIPO-4500-003','手机锂电池（4500mAh）','电子元器件','个','100','100','20','20'],
+    ['DSP-AMOLED-67-FULL','AMOLED显示屏总成（6.7英寸）','电子元器件','个','100','30','20','20'],
+    ['CAM-REAR-50MP-MOD','后置摄像头模组（50MP主摄）','电子元器件','个','100','30','20','20'],
+    ['MB-SOC-UNASSEMBLED','主板（含SoC，未贴片）','电子元器件','个','100','30','20','20'],
+    ['ACC-USB-C-CABLE-1M','USB Type-C 数据线（1m）','电子元器件','个','100','30','20','20'],
+    ['CHG-65W-GAN-ORG','原装快充充电器（65W）','电子元器件','个','100','30','20','20'],
+    ['HSG-BACK-GLS-BLUE','手机后盖（玻璃，蓝色）','电子元器件','个','100','30','20','20'],
+    ['CAM-FRONT-12MP','前置摄像头模组（12MP）','电子元器件','个','100','30','20','20']
+  ]
+})};
+
+/* ---------- 出入库查询 ---------- */
+PAGES['产品出入库查询'] = { group:1, render:()=>listPage({
+  group:1, sub:'产品出入库查询', crumb:['系统','产品出入库查询'],
+  filters:[{ph:'产品名称'},{ph:'请选择出入库类型',type:'select'},{ph:'请选择时间',type:'date'}],
+  cols:[['产品编码','12%'],['产品名称','15%'],['业务单据','20%'],['业务类型','11%'],['数量','9%'],['剩余库存','10%'],['时间','11%'],['操作','9%']],
+  rows:[
+    ['A3288','iphone16','SO20260127001','销售出库','-100','200','2026-01-27',{t:'link',v:['查看单据']}],
+    ['A3289','iPhone 16 Plus','PI20260127001','产品入库','+100','200','2026-01-27',{t:'link',v:['查看单据']}]
+  ]
+})};
+
+PAGES['物料出入库查询'] = { group:1, render:()=>listPage({
+  group:1, sub:'物料出入库查询', crumb:['系统','物料出入库查询'],
+  filters:[{ph:'物料名称'},{ph:'请选择出入库类型',type:'select'},{ph:'请选择时间',type:'date'}],
+  cols:[['物料编码','17%'],['物料名称','24%'],['业务单据','20%'],['业务类型','11%'],['数量','9%'],['剩余库存','9%'],['时间','10%']],
+  rows:[
+    ['BAT-LIPO-4500-003','手机锂电池（4500mAh）','PR20260127001','采购入库','+500','620','2026-01-27'],
+    ['DSP-AMOLED-67-FULL','AMOLED显示屏总成（6.7英寸）','SCLL20260127001','生产领料','-120','380','2026-01-27'],
+    ['CAM-REAR-50MP-MOD','后置摄像头模组（50MP主摄）','SCLL20260127001','生产领料','-120','260','2026-01-27'],
+    ['MB-SOC-UNASSEMBLED','主板（含SoC，未贴片）','PR20260127002','采购入库','+200','410','2026-01-27']
+  ]
+})};
+
+/* ---------- 入库管理 ---------- */
+const IN_NOTE = note('完整数据流转链路（MES）', [
+  '1、ERP 销售订单推送给 MES，同步 MES 生成销售发货出库单，绑定：销售订单号、对应成品编码、计划发货数量',
+  '2、MES 自动下发发货指令，同步推送至 WMS【销售出库】模块',
+  '3、WMS 生成拣货任务，下发至 PDA 拣货终端',
+  '4、备货、出库、核实实发数量、扫码复核、在途运输、签收确认、库存扣减、单据闭环',
+  '5、WMS 扫码收货完成后，单据状态由「未出库」→「部分出库」→「已出库」，仓储存量同步回传',
+  '6、WMS 出库完成后数据回传 MES，闭环销售发货任务'
+]);
+
+PAGES['产品入库'] = { group:2, render:()=>listPage({
+  group:2, sub:'产品入库', crumb:['系统','产品入库'],
+  filters:[{ph:'产品名称'},{ph:'入库单号'},{ph:'生产任务单号'},{ph:'请选择状态',type:'select'}],
+  cols:[['入库单号','15%'],['生产任务单号','15%'],['包装编码','20%'],['产品编码','9%'],['产品名称','10%'],['产品数量','8%'],['入库状态','10%'],['操作','13%']],
+  rows:[
+    ['PI20260127001','RWD20260127001','BOX20260127ABC123456','A3288','iphone16','100','待入库',{t:'link',v:['入库详情']}],
+    ['PI20260127002','RWD20260127001','BOX20260127ABC123457','A3288','iphone16','50','已入库',{t:'link',v:['入库详情']}],
+    ['PI20260127003','RWD20260127002','BOX20260127ABC123458','A3288','iphone16','100','已入库',{t:'link',v:['入库详情']}],
+    ['PI20260127004','RWD20260127002','BOX20260127ABC123459','A3288','iphone16','100','已入库',{t:'link',v:['入库详情']}]
+  ],
+  note: IN_NOTE
+})};
+
+PAGES['采购入库'] = { group:2, render:()=>listPage({
+  group:2, sub:'采购入库', crumb:['系统','采购入库'],
+  filters:[{ph:'物料名称'},{ph:'入库单号'},{ph:'关联检验单号'},{ph:'请选择状态',type:'select'}],
+  cols:[['入库单号','15%'],['检验单号','15%'],['物料编码','17%'],['物料名称','16%'],['入库数量','9%'],['库位','10%'],['入库状态','9%'],['操作','9%']],
+  rows:[
+    ['PR20260127001','JY20260127001','BAT-LIPO-4500-003','手机锂电池（4500mAh）','500','A1-01-01','待入库',{t:'link',v:['入库详情']}],
+    ['PR20260127002','JY20260127001','DSP-AMOLED-67-FULL','AMOLED显示屏总成','300','A1-01-02','已入库',{t:'link',v:['入库详情']}],
+    ['PR20260127003','JY20260127002','CAM-REAR-50MP-MOD','后置摄像头模组','260','A1-02-01','已入库',{t:'link',v:['入库详情']}],
+    ['PR20260127004','JY20260127003','MB-SOC-UNASSEMBLED','主板（含SoC，未贴片）','410','A1-02-02','待入库',{t:'link',v:['入库详情']}]
+  ],
+  note: note('完整数据流转链路（MES-WMS-ERP）', [
+    '1、ERP 采购下单 → MES 下发来料检验任务',
+    '2、货车到达 → WMS 来料检验 PDA 扫码核验',
+    '3、检验合格 → WMS 采购入库',
+    '4、入库完成回传 MES → MES 更新物料、下发生产领料',
+    '5、WMS 入库数据回写 ERP → 生成应付单 → 后续财务结算付款'
+  ])
+})};
+
+PAGES['生产退料'] = { group:2, render:()=>listPage({
+  group:2, sub:'生产退料', crumb:['系统','生产退料'],
+  filters:[{ph:'物料名称'},{ph:'退料单号'},{ph:'生产任务单号'},{ph:'请选择状态',type:'select'}],
+  cols:[['退料单号','15%'],['生产任务单号','15%'],['包装编码','20%'],['物料编码','9%'],['物料名称','11%'],['退料数量','8%'],['入库状态','10%'],['操作','12%']],
+  rows:[
+    ['RT20260127001','RWD20260127001','BOX20260127ABC123501','BAT-LIPO-4500-003','手机锂电池（4500mAh）','40','待入库',{t:'link',v:['入库详情']}],
+    ['RT20260127002','RWD20260127001','BOX20260127ABC123502','DSP-AMOLED-67-FULL','AMOLED显示屏总成','12','已入库',{t:'link',v:['入库详情']}],
+    ['RT20260127003','RWD20260127002','BOX20260127ABC123503','CAM-REAR-50MP-MOD','后置摄像头模组','8','已入库',{t:'link',v:['入库详情']}]
+  ]
+})};
+
+PAGES['盘盈入库'] = { group:2, render:()=>listPage({
+  group:2, sub:'盘盈入库', crumb:['系统','盘盈入库'],
+  filters:[{ph:'物料名称'},{ph:'盘点单号'},{ph:'请选择入库仓库',type:'select'},{ph:'请选择状态',type:'select'}],
+  cols:[['盘点单号','18%'],['物料编码','18%'],['物料名称','24%'],['盘盈数量','10%'],['入库仓库','12%'],['入库状态','9%'],['操作','9%']],
+  rows:[
+    ['PD20260127001','BAT-LIPO-4500-003','手机锂电池（4500mAh）','10','1#原料仓','待入库',{t:'link',v:['入库详情']}],
+    ['PD20260127001','DSP-AMOLED-67-FULL','AMOLED显示屏总成','6','1#原料仓','已入库',{t:'link',v:['入库详情']}],
+    ['PD20260127002','HSG-BACK-GLS-BLUE','手机后盖（玻璃，蓝色）','15','2#成品仓','已入库',{t:'link',v:['入库详情']}]
+  ]
+})};
+
+/* ---------- 入库详情 ---------- */
+PAGES['入库详情'] = { group:2, sub:'产品入库', backTo:'产品入库', render:()=>detailPage({
+  group:2, sub:'产品入库', crumb:['系统','产品入库'], title:'入库详情', backTo:'产品入库',
+  action:{ text:'提交入库', to:'提交前校验', hint:'提交前自动跑 11 条校验' },
+  sections:[
+    { title:'基础信息', kv:[
+      ['入库单号','PI20260127001'],['生产任务单号','RWD20260127001'],['包装箱号','BOX20260127ABC123456'],['产品编码','A3288'],
+      ['产品名称','iphone16'],['产品数量','100'],['单据状态','已入库'],['单据创建时间','2026/01/27 10:20:00'],
+      ['单据创建人','王建峰'],['入库人','王建峰'],['入库时间','2026/01/27 10:20:00']
+    ]},
+    { title:'箱内产品明细', table:{
+      cols:[['序号','12%'],['产品名称','44%'],['产品SN码','44%']],
+      rows:[['1','iphone16','SN2026A1B2C3D4E1'],['2','iphone16','SN2026A1B2C3D4E2'],['3','iphone16','SN2026A1B2C3D4E3'],
+            ['4','iphone16','SN2026A1B2C3D4E4'],['5','iphone16','SN2026A1B2C3D4E5'],['6','iphone16','SN2026A1B2C3D4E6']]
+    }}
+  ]
+})};
+
+/* ---------- 出库管理 ---------- */
+PAGES['销售出库'] = { group:3, render:()=>listPage({
+  group:3, sub:'销售出库', crumb:['系统','销售出库'],
+  filters:[{ph:'产品名称'},{ph:'出库单号'},{ph:'请选择销售订单号'},{ph:'请选择状态',type:'select'}],
+  cols:[['出库单号','15%'],['销售订单号','15%'],['产品编码','10%'],['产品名称','11%'],['计划出库','9%'],['实际出库','9%'],['单据状态','9%'],['时间','11%'],['操作','11%']],
+  rows:[
+    ['SO20260127001','XSDD20260127001','A3288','iphone16','20','20','待出库','2026-01-27',{t:'link',v:['出库详情']}],
+    ['SO20260127002','XSDD20260127002','A3288','iphone16','50','50','已出库','2026-01-27',{t:'link',v:['出库详情']}],
+    ['SO20260127003','XSDD20260127003','A3289','iPhone 16 Plus','80','60','部分出库','2026-01-27',{t:'link',v:['出库详情']}],
+    ['SO20260127004','XSDD20260127004','A3289','iPhone 16 Plus','100','100','已出库','2026-01-27',{t:'link',v:['出库详情']}]
+  ],
+  note: IN_NOTE
+})};
+
+PAGES['领料出库'] = { group:3, render:()=>listPage({
+  group:3, sub:'领料出库', crumb:['系统','领料出库'],
+  filters:[{ph:'物料名称'},{ph:'领料单号'},{ph:'生产任务单号'},{ph:'请选择状态',type:'select'}],
+  cols:[['领料单号','17%'],['生产任务单号','17%'],['物料编码','17%'],['物料名称','22%'],['需求数量','10%'],['已发数量','9%'],['操作','8%']],
+  rows:[
+    ['PL20260127001','RWD20260127001','BAT-LIPO-4500-003','手机锂电池（4500mAh）','200','200',{t:'link',v:['领料详情']}],
+    ['PL20260127002','RWD20260127001','DSP-AMOLED-67-FULL','AMOLED显示屏总成','120','90',{t:'link',v:['领料详情']}],
+    ['PL20260127003','RWD20260127002','CAM-REAR-50MP-MOD','后置摄像头模组','120','0',{t:'link',v:['领料详情']}],
+    ['PL20260127004','RWD20260127002','MB-SOC-UNASSEMBLED','主板（含SoC，未贴片）','120','120',{t:'link',v:['领料详情']}]
+  ]
+})};
+
+PAGES['盘亏出库'] = { group:3, render:()=>listPage({
+  group:3, sub:'盘亏出库', crumb:['系统','盘亏出库'],
+  filters:[{ph:'物料名称'},{ph:'盘点单号'},{ph:'请选择出库仓库',type:'select'},{ph:'请选择状态',type:'select'}],
+  cols:[['盘点单号','18%'],['物料编码','18%'],['物料名称','24%'],['盘亏数量','10%'],['出库仓库','12%'],['出库状态','9%'],['操作','9%']],
+  rows:[
+    ['PD20260127001','BAT-LIPO-4500-003','手机锂电池（4500mAh）',{t:'neg',v:'10'},'1#原料仓','待出库',{t:'link',v:['出库详情']}],
+    ['PD20260127001','DSP-AMOLED-67-FULL','AMOLED显示屏总成',{t:'neg',v:'4'},'1#原料仓','已出库',{t:'link',v:['出库详情']}],
+    ['PD20260127002','HSG-BACK-GLS-BLUE','手机后盖（玻璃，蓝色）',{t:'neg',v:'15'},'2#成品仓','已出库',{t:'link',v:['出库详情']}]
+  ]
+})};
+
+/* ---------- 出库详情 ---------- */
+PAGES['出库详情'] = { group:3, sub:'销售出库', backTo:'销售出库', render:()=>detailPage({
+  group:3, sub:'销售出库', crumb:['系统','销售出库'], title:'出库详情', backTo:'销售出库',
+  action:{ text:'提交出库', to:'提交前校验', hint:'提交前自动跑 11 条校验' },
+  sections:[
+    { title:'基础信息', kv:[
+      ['出库单号','SO20260127001'],['领料订单编号','SO20260127001'],['产品编码','A3288'],['产品名称','iphone16'],
+      ['计划出库数量','100'],['实际出库数量','20'],['单据状态','待出库'],['单据创建人','王建峰'],
+      ['单据创建时间','2026/01/27 10:20:00']
+    ]},
+    { title:'出库明细', badge:'AI 已按拣货路径排序', table:{
+      cols:[['序号','10%'],['产品名称','20%'],['产品SN码','28%'],['库位信息','16%'],['出库状态','10%'],['出库人','8%'],['出库时间','18%']],
+      rows:[
+        ['1','iphone16','SN2026A1B2C3D4E1','A1-01-01-01','已出库','王建峰','2026/01/27 10:20:00'],
+        ['2','iphone16','SN2026A1B2C3D4E2','A1-02-01-01','已出库','王建峰','2026/01/27 10:20:00'],
+        ['3','iphone16','SN2026A1B2C3D4E3','A1-02-02-01','待出库','王建峰','2026/01/27 10:20:00'],
+        ['4','iphone16','SN2026A1B2C3D4E4','A1-02-03-01','待出库','王建峰','2026/01/27 10:20:00']
+      ]
+    }}
+  ]
+})};
+
+/* ---------- 库内作业 ---------- */
+PAGES['来料检验'] = { group:4, render:()=>listPage({
+  group:4, sub:'来料检验', crumb:['系统','来料检验'],
+  filters:[{ph:'检验编号'},{ph:'物流单号'},{ph:'检验时间',type:'date'}],
+  cols:[['检验编号','17%'],['物流单号','13%'],['运输车牌号','12%'],['来料检验状态','11%'],['来料检验结果','13%'],['单据创建人','8%'],['单据创建时间','12%'],['操作','14%']],
+  rows:[
+    ['JY20260127001','zt596049606','冀A056960','待检','-','王建峰','-',{t:'link',v:['详情']}],
+    ['JY20260127002','zt596049606','冀B056960','检验中','-','王建峰','2026/01/26 15:40:00',{t:'link',v:['详情']}],
+    ['JY20260127003','zt596049606','冀B056960','已检','部分合格','王建峰','2026/01/26 15:40:00',{t:'link',v:['详情','生成入库单']}],
+    ['JY20260127004','zt596049606','冀C056960','检验中','-','王建峰','2026/01/27 09:15:00',{t:'link',v:['详情']}],
+    ['JY20260127005','zt596049606','冀C056960','已检','合格','王建峰','2026/01/27 09:15:00',{t:'link',v:['详情','生成入库单']}]
+  ],
+  note: `<div style="display:flex;gap:40px;margin-top:26px;font-size:12px;color:#333">
+      <div style="width:90px;color:#666">结果状态</div><div style="color:#666">触发节点</div>
+    </div>
+    <table style="margin-top:8px;max-width:760px"><thead><tr><th style="width:18%">结果状态</th><th>触发节点</th></tr></thead>
+    <tbody>
+      <tr><td>合格</td><td class="l">实际接收数量 = 计划接收数量，且所有物料条码校验通过，质量检验合格</td></tr>
+      <tr><td>部分合格</td><td class="l">实际接收数量 &lt; 计划接收数量，部分物料未在单据明细内 / 质量不合格</td></tr>
+      <tr><td>合格（超收）</td><td class="l">实际接收数量 &gt; 计划接收数量，且所有物料条码校验通过，质量检验合格</td></tr>
+    </tbody></table>
+    ${note('完整数据流转链路（MES-WMS-ERP）', [
+      '1、ERP 采购下单 → MES 下发来料检验任务',
+      '2、货车到达 → WMS 来料检验 PDA 扫码核验',
+      '3、检验合格 → WMS 采购入库',
+      '4、入库完成回传 MES → MES 更新物料、下发生产领料',
+      '5、WMS 入库数据回写 ERP → 生成应付单 → 后续财务结算付款'
+    ])}`
+})};
+
+PAGES['物料盘点'] = { group:4, render:()=>listPage({
+  group:4, sub:'物料盘点', crumb:['系统','物料盘点'],
+  filters:[{ph:'盘点单号'},{ph:'请选择盘点类型',type:'select'},{ph:'请选择时间',type:'date'}],
+  actions:['新增盘点单'],
+  cols:[['盘点单号','14%'],['盘点类型','7%'],['盘点仓库','10%'],['盘点人','8%'],['盘点时间','10%'],['全部','5%'],['已盘','5%'],['未盘','5%'],['盘亏','5%'],['盘盈','5%'],['操作','26%']],
+  rows:[
+    ['PD20260127001','全盘','原料料仓','王建峰','2026-01-27','100','100','0','0','0',{t:'link',v:['盘点详情']}],
+    ['PD20260127001','抽盘','原料料仓','王建峰','2026-01-27','100','90','0',{t:'neg',v:'10'},'0',{t:'link',v:['盘点详情','盘亏出库']}],
+    ['PD20260127001','抽盘','原料料仓','王建峰','2026-01-27','100','90','0',{t:'neg',v:'10'},{t:'neg',v:'10'},{t:'link',v:['盘点详情','盘亏出库','盘盈入库']}],
+    ['PD20260127001','抽盘','原料料仓','王建峰','2026-01-27','100','90','0',{t:'neg',v:'10'},{t:'neg',v:'10'},{t:'link',v:['盘点详情','盘亏出库','盘盈入库']}]
+  ]
+})};
+
+PAGES['盘点详情'] = { group:4, sub:'物料盘点', backTo:'物料盘点', render:()=>detailPage({
+  group:4, sub:'物料盘点', crumb:['系统','物料盘点'], title:'盘点详情', backTo:'物料盘点',
+  action:{ text:'提交盘点', to:'提交前校验', hint:'提交前校验差异与未盘库位' },
+  sections:[
+    { title:'盘点信息', badge:'明盘演示 · 生产默认盲盘', kv:[
+      ['盘点单号','PD20260127001'],['盘点类型','全盘'],
+      ['盘点仓库','1#原料仓'],['盘点人','王建峰'],['全部','100'],['已盘','100'],
+      ['未盘','0'],['盘亏','7'],['盘盈','0'],
+      ['盘点时间','2026/01/27 10:20:00'],['单据创建时间','2026/01/27 09:00:00']
+    ]},
+    { title:'盘点明细', table:{
+      cols:[['序号','10%'],['物料名称','40%'],['库位','18%'],['账面','10%'],['实盘','10%'],['盘亏','6%'],['盘盈','6%']],
+      rows:[
+        ['1','手机锂电池（4500mAh）','A1-01-01','200','200','0','0'],
+        ['2','AMOLED显示屏总成（6.7英寸）','A1-01-02','200','190','10','0'],
+        ['3','后置摄像头模组（50MP主摄）','A1-02-01','200','200','0','0'],
+        ['4','主板（含SoC，未贴片）','A1-02-02','200','193','7','0'],
+        ['5','USB Type-C 数据线（1m）','A1-03-01','200','200','0','0']
+      ]
+    }}
+  ]
+})};
+
+PAGES['物料移位'] = { group:4, render:()=>listPage({
+  group:4, sub:'物料移位', crumb:['系统','物料移位'],
+  filters:[{ph:'物料名称'},{ph:'移库单号'},{ph:'请选择移出仓库',type:'select'},{ph:'请选择状态',type:'select'}],
+  cols:[['移库单号','18%'],['物料编码','18%'],['物料名称','24%'],['移出库位','12%'],['移入库位','12%'],['数量','8%'],['操作','8%']],
+  rows:[
+    ['YK20260127001','BAT-LIPO-4500-003','手机锂电池（4500mAh）','A1-01-01','B2-01-01','60',{t:'link',v:['移位详情']}],
+    ['YK20260127002','DSP-AMOLED-67-FULL','AMOLED显示屏总成','A1-01-02','B2-01-02','40',{t:'link',v:['移位详情']}],
+    ['YK20260127003','HSG-BACK-GLS-BLUE','手机后盖（玻璃，蓝色）','B2-01-03','B2-02-01','80',{t:'link',v:['移位详情']}]
+  ]
+})};
+
+/* ---------- 基础设置 ---------- */
+PAGES['仓库管理'] = { group:5, render:()=>listPage({
+  group:5, sub:'仓库管理', crumb:['系统','仓库管理'],
+  filters:[{ph:'仓库名称'},{ph:'仓库类型',type:'select'},{ph:'仓库状态',type:'select'}],
+  cols:[['仓库编码','13%'],['仓库名称','18%'],['仓库类型','18%'],['库位数量','14%'],['状态','16%'],['负责人','10%'],['操作','11%']],
+  rows:[
+    ['WH-001','1#原料仓',{t:'tag',v:'原料仓',c:'#1891ff'},'6',{t:'switch',on:true},'张三',{t:'link',v:['详情','编辑']}],
+    ['WH-002','2#成品仓',{t:'tag',v:'成品仓',c:'#7c5cff'},'8',{t:'switch',on:true},'张三',{t:'link',v:['详情','编辑']}],
+    ['WH-003','1#辅料仓',{t:'tag',v:'辅料仓',c:'#f0a020'},'9',{t:'switch',on:true},'张三',{t:'link',v:['详情','编辑']}],
+    ['WH-004','1#呆滞料仓',{t:'tag',v:'呆滞料仓',c:'#e5484d'},'0',{t:'switch',on:true},'张三',{t:'link',v:['详情','编辑']}]
+  ]
+})};
+
+PAGES['库位管理'] = { group:5, render:()=>listPage({
+  group:5, sub:'库位管理', crumb:['系统','库位管理'],
+  filters:[{ph:'库位名称'},{ph:'库位类型',type:'select'},{ph:'库位状态',type:'select'}],
+  cols:[['库位编码','13%'],['库位名称','13%'],['库位类型','16%'],['所属仓库','16%'],['库位容量（托盘）','14%'],['库位容量（物料）','13%'],['状态','8%'],['操作','11%']],
+  rows:[
+    ['KW-001','1#库位',{t:'tag',v:'普通库位',c:'#1891ff'},'1#原料仓','6','6','空闲',{t:'link',v:['详情','编辑']}],
+    ['WH-002','2#库位',{t:'tag',v:'立体库位',c:'#7c5cff'},'2#成品仓','6','6','占用',{t:'link',v:['详情','编辑']}],
+    ['WH-003','3#库位',{t:'tag',v:'恒温库位',c:'#f0a020'},'1#辅料仓','6','6','锁定',{t:'link',v:['详情','编辑']}],
+    ['WH-004','4#库位',{t:'tag',v:'危品库位',c:'#e5484d'},'1#呆滞料仓','6','6','维保',{t:'link',v:['详情','编辑']}]
+  ]
+})};
+
+PAGES['条码管理'] = { group:5, render:()=>listPage({
+  group:5, sub:'条码管理', crumb:['系统','条码管理'],
+  filters:[{ph:'条码类型',type:'select'}],
+  actions:['新增条码','批量打印'],
+  cols:[['条码','30%'],['类型','35%'],['生成时间','35%']],
+  rows:[
+    ['KQ-001','库区条码','2026/01/27 10:20:00'],
+    ['WH-002','库位条码','2026/01/27 10:20:00'],
+    ['KQ-003','库区条码','2026/01/27 10:20:00'],
+    ['WH-004','库位条码','2026/01/27 10:20:00']
+  ]
+})};
+
+/* =========================================================
+   APP 页
+   ========================================================= */
+function phone({ title, body, back, right, tab }){
+  return `<div class="phone">
+    <div class="status"><span>9:41</span><span style="letter-spacing:2px">●●● ⏻</span></div>
+    <div class="app-hd">
+      ${back ? '<span class="l" data-page="'+back+'">‹</span>' : ''}
+      <span>${title}</span>
+      ${right ? '<span class="r">'+right+'</span>' : ''}
+    </div>
+    <div class="app-body">${body}</div>
+    ${tab ? `<div class="tabbar">
+      <div class="${tab==='home'?'on':''}">${svg('home')}<span>工作台</span></div>
+      <div class="${tab==='me'?'on':''}">${svg('user')}<span>我的</span></div>
+    </div>` : ''}
+  </div>`;
+}
+
+PAGES['APP 主页'] = { group:7, app:true, render(){
+  const grp = (h, items) => `<div class="app-grp"><h5>${h}</h5><div class="app-grid">
+    ${items.map(([ic,name,page])=>`<div class="cell" ${page?'data-page="'+page+'"':''}><div class="ic">${svg(ic)}</div><span>${name}</span></div>`).join('')}
+  </div></div>`;
+  return phone({
+    title:'工作台', tab:'home',
+    body: grp('入库管理', [['in','产品入库','APP 产品入库'],['out','生产退料','APP 入库作业'],['truck','采购入库','APP 采购入库'],['doc','盘盈入库','APP 入库作业']])
+        + grp('出库管理', [['out','销售出库','APP 出库作业'],['box','生产领料','APP 出库作业']])
+        + grp('库内作业', [['scan','来料验收','APP 来料验收'],['doc','物料盘点','APP 库内作业'],['box','物料移位','APP 库内作业']])
+  });
+}};
+
+PAGES['APP 产品入库'] = { group:7, app:true, render(){
+  const card = (code,name,box,qty,st) => `<div class="app-card" data-page="APP 产品入库详情">
+    <div class="hd"><b>产品编码：${code}</b><i>${st}</i></div>
+    <div class="row"><span class="k">产品名称</span><span class="v">${name}</span></div>
+    <div class="row"><span class="k">箱码</span><span class="v">${box}</span></div>
+    <div class="row"><span class="k">产品数量</span><span class="v">${qty}</span></div>
+    <div class="app-meta"><span class="m">${svg('user')}王建峰</span><span class="m">${svg('clock')}2026/01/27 10:20:00</span></div>
+  </div>`;
+  return phone({
+    title:'产品入库', back:'APP 主页', tab:'home',
+    body: card('A3288','iphone16','BOX20260127ABC123456','100','待入库')
+        + card('A3288','iphone16','BOX20260127ABC123457','50','待入库')
+        + card('A3289','iPhone 16 Plus','BOX20260127ABC123458','50','已入库')
+  });
+}};
+
+PAGES['APP 产品入库详情'] = { group:7, app:true, render(){
+  const item = (code,name,box,qty) => `<div class="app-card">
+    <div class="hd"><b>产品编码：${code}</b><i>待入库</i></div>
+    <div class="row"><span class="k">产品名称</span><span class="v">${name}</span></div>
+    <div class="row"><span class="k">箱码</span><span class="v">${box}</span></div>
+    <div class="row"><span class="k">产品数量</span><span class="v">${qty}</span></div>
+    <div class="app-meta"><span class="m">${svg('user')}王建峰</span><span class="m">${svg('clock')}2026/01/27 10:20:00</span></div>
+  </div>`;
+  return phone({
+    title:'产品入库', back:'APP 产品入库', right:'待入库',
+    body: item('A3288','iphone16','BOX20260127ABC123456','100') + item('A3288','iphone16','BOX20260127ABC123457','100')
+      + `<button class="ai-btn primary" style="width:100%;margin-top:4px;height:40px" data-page="库位推荐（APP）">扫码完成，去上架选位</button>
+         <div class="ai-foot" style="text-align:center">上架前系统会推荐库位，采纳后锁定</div>`
+  });
+}};
+
+PAGES['APP 采购入库'] = { group:7, app:true, render(){
+  const card = (no,jy,st) => `<div class="app-card" data-page="APP 产品入库详情">
+    <div class="hd"><b>入库单号：${no}</b><i>${st}</i></div>
+    <div class="row"><span class="k">关联检验单号</span><span class="v">${jy}</span></div>
+    <div class="app-meta"><span class="m">${svg('user')}王建峰</span><span class="m">${svg('clock')}2026/01/27 10:20:00</span></div>
+  </div>`;
+  return phone({
+    title:'采购入库', back:'APP 主页', tab:'home',
+    body: card('PR20260127004','JY20260127003','待入库') + card('PR20260127001','JY20260127001','部分入库')
+  });
+}};
+
+PAGES['APP 来料验收'] = { group:7, app:true, render(){
+  const card = (no,st) => `<div class="app-card">
+    <div class="hd"><b>质检单号：${no}</b><i>${st}</i></div>
+    <div class="row"><span class="k">供应商编码</span><span class="v">GYS-ZTE-001</span></div>
+    <div class="row"><span class="k">关联检验单号</span><span class="v">JY20260127001</span></div>
+    <div class="app-meta"><span class="m">${svg('user')}王建峰</span><span class="m">${svg('clock')}2026/01/27 10:20:00</span></div>
+  </div>`;
+  return phone({
+    title:'来料验收', back:'APP 主页', right:'扫码',
+    body: card('JY20260127004','待验收') + card('JY20260127005','已验收')
+  });
+}};
+
+/* A06 入库作业：生产退料 + 盘盈入库 */
+PAGES['APP 入库作业'] = { group:7, app:true, render(){
+  const seg = (a,b) => `<div style="display:flex;gap:8px;margin-bottom:10px">
+    <span style="flex:1;text-align:center;padding:7px 0;border-radius:6px;background:#1891FF;color:#fff;font-size:13px">${a}</span>
+    <span style="flex:1;text-align:center;padding:7px 0;border-radius:6px;background:#f2f3f5;color:#666;font-size:13px">${b}</span></div>`;
+  const card = (no,rel,mat,qty,loc,st) => `<div class="app-card" data-page="APP 产品入库详情">
+    <div class="hd"><b>${no}</b><i>${st}</i></div>
+    <div class="row"><span class="k">关联单号</span><span class="v">${rel}</span></div>
+    <div class="row"><span class="k">物料</span><span class="v">${mat}</span></div>
+    <div class="row"><span class="k">数量</span><span class="v">${qty}</span></div>
+    <div class="row"><span class="k">目标库位</span><span class="v">${loc}</span></div>
+    <div class="app-meta"><span class="m">${svg('user')}王建峰</span><span class="m">${svg('clock')}2026/01/27 10:20:00</span></div>
+  </div>`;
+  return phone({
+    title:'入库作业', back:'APP 主页', tab:'home',
+    body: seg('生产退料','盘盈入库')
+        + card('RT20260127001','RWD20260127001','手机锂电池（4500mAh）','40','A1-01-01（原库位）','待入库')
+        + card('RT20260127002','RWD20260127001','AMOLED显示屏总成','12','A1-01-02（原库位）','待入库')
+        + card('SG20260127001','PD20260127001','手机锂电池（4500mAh）','10','1#原料仓','待入库')
+        + `<div class="ai-foot" style="text-align:center">退料必须回原库位；盘盈入库单由主管在盘点确认环节生成</div>`
+  });
+}};
+
+/* A07 出库作业：销售出库 + 生产领料 */
+PAGES['APP 出库作业'] = { group:7, app:true, render(){
+  const seg = (a,b) => `<div style="display:flex;gap:8px;margin-bottom:10px">
+    <span style="flex:1;text-align:center;padding:7px 0;border-radius:6px;background:#1891FF;color:#fff;font-size:13px">${a}</span>
+    <span style="flex:1;text-align:center;padding:7px 0;border-radius:6px;background:#f2f3f5;color:#666;font-size:13px">${b}</span></div>`;
+  const card = (no,rel,mat,plan,done,st) => `<div class="app-card" data-page="拣货路径（APP）">
+    <div class="hd"><b>${no}</b><i>${st}</i></div>
+    <div class="row"><span class="k">关联单号</span><span class="v">${rel}</span></div>
+    <div class="row"><span class="k">物料</span><span class="v">${mat}</span></div>
+    <div class="row"><span class="k">计划 / 已发</span><span class="v">${plan} / ${done}</span></div>
+    <div class="app-meta"><span class="m">${svg('user')}王建峰</span><span class="m">${svg('clock')}2026/01/27 10:20:00</span></div>
+  </div>`;
+  return phone({
+    title:'出库作业', back:'APP 主页', tab:'home',
+    body: seg('销售出库','生产领料')
+        + card('SO20260127001','XSDD20260127001','iphone16（A3288）','20','0','待出库')
+        + card('PL20260127003','RWD20260127002','AMOLED显示屏总成','120','0','待出库')
+        + card('PL20260127002','RWD20260127001','AMOLED显示屏总成','120','90','部分出库')
+        + `<div class="ai-foot" style="text-align:center">点击卡片进入拣货任务，系统按库位坐标给出建议顺序</div>`
+  });
+}};
+
+/* A09 库内作业：物料盘点 + 物料移位 */
+PAGES['APP 库内作业'] = { group:7, app:true, render(){
+  const seg = (a,b) => `<div style="display:flex;gap:8px;margin-bottom:10px">
+    <span style="flex:1;text-align:center;padding:7px 0;border-radius:6px;background:#1891FF;color:#fff;font-size:13px">${a}</span>
+    <span style="flex:1;text-align:center;padding:7px 0;border-radius:6px;background:#f2f3f5;color:#666;font-size:13px">${b}</span></div>`;
+  const card = (no,k1,v1,k2,v2,k3,v3) => `<div class="app-card">
+    <div class="hd"><b>${no}</b><i>进行中</i></div>
+    <div class="row"><span class="k">${k1}</span><span class="v">${v1}</span></div>
+    <div class="row"><span class="k">${k2}</span><span class="v">${v2}</span></div>
+    <div class="row"><span class="k">${k3}</span><span class="v">${v3}</span></div>
+    <div class="app-meta"><span class="m">${svg('user')}王建峰</span><span class="m">${svg('clock')}2026/01/27 10:20:00</span></div>
+  </div>`;
+  return phone({
+    title:'库内作业', back:'APP 主页', tab:'home',
+    body: seg('物料盘点','物料移位')
+        + card('PD20260127001','盘点类型','全盘','仓库','1#原料仓','进度','已盘 88 / 100')
+        + card('YK20260127001','移出库位','A1-01-01','移入库位','B2-01-03','数量','12')
+        + `<div class="ai-foot" style="text-align:center">盲盘模式不显示账面数；移位需依次扫源库位、物料码、目标库位</div>`
+  });
+}};
+
+
+/* =========================================================
+   AI 建议层（V2.1 新增 5 屏）
+   ========================================================= */
+
+/* ① 智能问数 */
+PAGES['智能问数'] = { group:6, render(){
+  const bars = [176,168,192,180,204,164,156];
+  const days = ['周一','周二','周三','周四','周五','周六','周日'];
+  const pct  = ['—', '−5%', '+14%', '−6%', '+13%', '−20%', '−5%'];
+  const mx = Math.max(...bars);
+  return `<div class="pc">
+    ${topbar(6)}
+    <div class="pc-body">
+      ${subnav(6,'智能问数')}
+      <section class="content">
+        ${crumb(['AI 建议层','智能问数'])}
+        <div class="page">
+          <div class="ask-wrap">
+            <div class="ask-hd">
+              <h1>问一句话，出结论</h1>
+              <p>只读查询：可以查库存、流水、单据、排名与趋势，不会修改任何数据。</p>
+            </div>
+            <div class="ask-box">
+              <input value="上周 A3288 出了多少台？">
+              <button class="ask-send">提问</button>
+            </div>
+            <div class="chips">
+              <span class="chip">本月出库量 Top5 物料</span>
+              <span class="chip">哪些物料低于安全库存</span>
+              <span class="chip">昨天未完成的入库单</span>
+              <span class="chip">库存周转最慢的 5 个 SKU</span>
+            </div>
+            <div class="answer">
+              <div class="answer-hd"><span class="ai-tag">AI 回答</span><span>已查询 2026-10-19 ~ 10-25 的出库流水</span></div>
+              <div class="concl">上周 A3288 共出库 <em>1,240</em> 台，环比前一周 <em style="color:#17a34a;font-size:17px">+18%</em>。</div>
+              <div class="chart">
+                <div class="bars">
+                  ${bars.map((v,i)=>`<div class="bar"><b>${v}</b><i style="height:${Math.round(v/mx*100)}%"></i><span>${days[i]}</span></div>`).join('')}
+                </div>
+              </div>
+              <div class="answer-tb">
+                <table><thead><tr>
+                  <th style="width:22%">日期</th><th style="width:24%">出库数量（台）</th><th style="width:24%">单据数</th><th>较前日</th>
+                </tr></thead><tbody>
+                  ${bars.map((v,i)=>`<tr><td>10-${19+i} ${days[i]}</td><td>${v}</td><td>${[12,11,14,13,16,9,8][i]}</td><td class="${pct[i].startsWith('−')?'num-neg':''}">${pct[i]}</td></tr>`).join('')}
+                </tbody></table>
+              </div>
+              <div class="caliber">
+                <b>口径说明</b>：出库数量按「已出库」单据的实际出库数量汇总，不含待出库与部分出库；A3288 为成品编码，单位台；对比区间为 10-12 ~ 10-18。
+              </div>
+              <div class="answer-ft">
+                <span>数据更新至 2026-10-28 09:00 · 本次查询耗时 1.2s</span>
+                <span class="ops"><span class="link">查看完整流水</span><span class="link">导出</span><span class="link">继续追问</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>`;
+}};
+
+/* ② 库位推荐（APP 上架场景） */
+PAGES['库位推荐（APP）'] = { group:6, app:true, render(){
+  const alt = (code, why, tag) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #f2f5f8;gap:10px">
+      <div style="min-width:0">
+        <div style="font-size:12.5px;font-weight:700;color:#2b3d4f">${code}</div>
+        <div style="font-size:11px;color:#93a1ae;margin-top:3px">${why}</div>
+      </div>
+      <span style="font-size:11px;color:#8b96a2;white-space:nowrap">${tag}</span>
+    </div>`;
+  return phone({
+    title:'上架选位', back:'APP 产品入库', right:'待上架',
+    body: `
+      <div style="background:#f4f8fc;border-radius:8px;padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:12px;color:#5b6874;line-height:1.9">
+          <div style="display:flex;justify-content:space-between"><span>已收货</span><b style="color:#1d2b38">A3288 × 100 台</b></div>
+          <div style="display:flex;justify-content:space-between"><span>箱码</span><span style="color:#42566a">BOX20260127ABC123456</span></div>
+        </div>
+      </div>
+
+      <div class="ai-card">
+        <div class="hd">
+          <span class="ai-tag">AI 建议</span>
+          <span class="conf">置信度 高</span>
+        </div>
+        <div class="hl" style="margin-bottom:8px">建议放到 <em style="color:#0b6ed6">B2-01-03</em></div>
+        <div class="loc-big">B2-01-03</div>
+        <div class="loc-sub">2#成品仓 · B2 区 · 剩余容量 40%</div>
+        <ul class="reasons">
+          <li>同物料已有 2 托在此区，集中管理</li>
+          <li>距打包区 12m，低于同层均值 18m</li>
+          <li>可容纳本次 8 托，无需二次移位</li>
+        </ul>
+        <div class="ai-actions">
+          <button class="ai-btn primary" data-page="APP 产品入库详情">采纳</button>
+          <button class="ai-btn">换一个</button>
+          <button class="ai-btn ghost">不再提示</button>
+        </div>
+        <div class="ai-foot">AI 仅提供建议，不会占用库位；点击「采纳」后才锁定。<br>点「不再提示」后，7 天内不再展示该类建议。</div>
+      </div>
+
+      <div style="margin-top:16px;font-size:12px;font-weight:600;color:#42566a;margin-bottom:4px">其他候选</div>
+      ${alt('A1-02-05','同物料区，容量 15%，距 21m','评分 86')}
+      ${alt('B2-02-01','空库位，距打包区 26m','评分 81')}
+    `,
+    tab:'home'
+  });
+}};
+
+/* ③ 拣货路径（APP） */
+PAGES['拣货路径（APP）'] = { group:6, app:true, render(){
+  const picks = [
+    ['B2-01-03','iphone16','20'],
+    ['B2-01-01','iphone16','20'],
+    ['A1-02-05','iPhone 16 Plus','10'],
+    ['A1-02-03','iPhone 16 Plus','10'],
+    ['A1-01-07','iphone16','15'],
+    ['C1-03-02','iPhone 16 Plus','25']
+  ];
+  return phone({
+    title:'拣货任务 SO20260127001', back:'APP 出库作业', right:'共 12 个点',
+    body: `
+      <div class="ai-card" style="margin-bottom:14px">
+        <div class="hd"><span class="ai-tag">AI 已优化顺序</span><span class="conf">高</span></div>
+        <div style="display:flex;gap:18px;align-items:flex-end;margin-bottom:6px">
+          <div><div style="font-size:11px;color:#8b96a2">预计行走</div><div style="font-size:22px;font-weight:800;color:#0b6ed6">340m</div></div>
+          <div style="padding-bottom:3px"><div style="font-size:11px;color:#8b96a2">较默认顺序</div><div style="font-size:13px;font-weight:700;color:#17a34a">少走 180m（−35%）</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#93a1ae;margin-top:12px;padding-top:10px;border-top:1px dashed #e4eefa"><span>已拣 0 / 12</span><span>按建议顺序作业</span></div>
+      </div>
+
+      ${picks.map(([loc,name,qty],i)=>`
+        <div style="display:flex;gap:12px;align-items:center;padding:12px 4px;border-bottom:1px solid #f2f5f8">
+          <div style="width:22px;height:22px;flex:0 0 22px;border-radius:50%;background:${i<2?'#1891ff':'#eaf2fb'};color:${i<2?'#fff':'#5b6874'};font-size:11px;font-weight:700;display:grid;place-items:center">${i+1}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12.5px;font-weight:600;color:#2b3d4f">${loc}</div>
+            <div style="font-size:11px;color:#93a1ae;margin-top:2px">${name} · 应拣 ${qty} 台</div>
+          </div>
+          <span style="font-size:11px;color:#0b6ed6">扫码</span>
+        </div>`).join('')}
+
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="ai-btn primary" style="flex:1">按 AI 建议</button>
+        <button class="ai-btn" style="flex:1">按库位编码</button>
+      </div>
+      <div class="ai-foot" style="text-align:center">上拉加载剩余 6 个点 · 顺序仅影响展示，不改变任务归属</div>
+    `,
+    tab:'home'
+  });
+}};
+
+/* ④ 提交前校验（PC） */
+PAGES['提交前校验'] = { group:6, render(){
+  const item = (st, code, title, desc, acts) => {
+    const ico = st==='ok' ? '<span class="ico ok">✓</span>' : st==='warn' ? '<span class="ico warn">⚠</span>' : st==='skip' ? '<span class="ico" style="background:#eef1f5;color:#8a94a3">–</span>' : '<span class="ico block">✕</span>';
+    const op = st==='skip' ? 'opacity:.55' : '';
+    return `<div class="check-item" style="${op}">${ico}
+      <div class="body">
+        <div class="row1"><b>${title}</b><span class="code">${code}</span></div>
+        <div class="desc">${desc}</div>
+        ${acts?`<div class="act">${acts.map(a=>`<span class="link">${a}</span>`).join('')}</div>`:''}
+      </div>
+    </div>`;
+  };
+
+  const head = (label, no, detail, tag) => `<div class="ai-card" style="margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:12px;color:#8b96a2;margin-bottom:6px">待提交单据 · ${label}</div>
+        <div style="font-size:14px;font-weight:700;color:#12324a">${no}</div>
+        <div style="font-size:12px;color:#7b8794;margin-top:6px">${detail}</div>
+      </div>
+      <span class="ai-tag">${tag}</span>
+    </div>`;
+
+  const sum = (ok, warn, block) => `<span class="sum"><i>${ok} 项通过</i> · <u>${warn} 项预警</u> · ${block} 项阻断</span>`;
+
+  return `<div class="pc">
+    ${topbar(6)}
+    <div class="pc-body">
+      ${subnav(6,'提交前校验')}
+      <section class="content">
+        ${crumb(['AI 建议层','提交前校验'])}
+        <div class="page">
+          <div class="detail-hd"><span class="back" data-page="入库详情">←</span><h2>提交前校验</h2></div>
+
+          <div class="ctabs">
+            <span class="ctab on" data-ct="in">入库单<i>1</i></span>
+            <span class="ctab" data-ct="out">出库单<i>2</i></span>
+            <span class="ctab" data-ct="count">盘点单<i>1</i></span>
+            <span class="ctab-tip">从单据详情页点「提交」进入此处</span>
+          </div>
+
+          <!-- ========== 入库单 ========== -->
+          <div data-pane="in">
+            ${head('入库', '入库单 PI20260127001', 'iphone16 × 100 · 包装箱 BOX20260127ABC123456 · 状态 待入库', 'AI 校验完成 0.8s')}
+            <div class="check">
+              <div class="check-hd"><b>校验结果</b>${sum(3,1,0)}</div>
+              ${item('warn','R1','数量偏差 12%','本次实收 112 台，计划 100 台，偏差 +12%，超过阈值 10%。建议核对实物数量，或填写差异原因后提交。',['查看差异明细','填写原因'])}
+              ${item('ok','R2','重复扫码校验','本单内 100 个箱码 / SN 均无 24 小时内重复记录。')}
+              ${item('ok','R3','库位与物料类型匹配','目标库位 B2-01-03 为普通库位，与「成品」属性匹配，剩余容量满足 8 托。')}
+              ${item('ok','R4','超收比例','实收 112 / 计划 100，超收 12%，超过阈值 5% → 已自动转主管审批。')}
+              ${item('skip','R5','可用库存校验','不适用于入库单，已跳过（该项不计入通过数）。')}
+              <div class="check-ft">
+                <button class="ai-btn ghost" data-page="入库详情">返回修改</button>
+                <button class="ai-btn">填写原因并提交</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========== 出库单 ========== -->
+          <div data-pane="out" hidden>
+            ${head('出库', '领料单 PL20260127003', 'AMOLED显示屏总成 × 120 · 需求工单 RWD20260127002 · 状态 待出库', 'AI 校验完成 0.9s')}
+            <div class="check">
+              <div class="check-hd"><b>校验结果</b>${sum(2,1,1)}</div>
+              ${item('block','R5','可用库存不足 24 个','需求 120 个，当前可用库存 96 个（总库存 100，锁库 4），缺口 24。阻断级：必须拆分单据或调整数量后才能提交。',['按 96 拆分生成一单','指定替代物料'])}
+              ${item('warn','R1','数量偏差 −20%','计划 120，拟发 96，偏差 −20%，超过阈值 10%。拆分后本单按 96 提交不影响工单，剩余 24 转入下一单。',['查看差异明细'])}
+              ${item('ok','R2','重复扫码校验','本单内 96 个序列号均无 24 小时内重复记录。')}
+              ${item('ok','R3','库位与物料类型匹配','拣货库位 A1-01-02 为恒温库位，与「电子元器件」属性匹配。')}
+              <div class="check-ft">
+                <button class="ai-btn ghost" data-page="出库详情">返回修改</button>
+                <button class="ai-btn" style="opacity:.45;cursor:not-allowed">提交出库（存在阻断项）</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========== 盘点单 ========== -->
+          <div data-pane="count" hidden>
+            ${head('盘点', '盘点单 PD20260127001', '全盘 · 1#原料仓 · 已盘 88 / 100 · 盘亏 10 项', 'AI 校验完成 1.1s')}
+            <div class="check">
+              <div class="check-hd"><b>校验结果</b>${sum(2,2,0)}</div>
+              ${item('warn','R8','未盘库位 12 个','提交后这 12 个库位将按账面数结转，并解除锁定。若需继续盘点，请返回列表。',['查看未盘清单','继续盘点'])}
+              ${item('warn','R9','差异率 8.2% 超阈值','盘亏 10 项 / 应盘 100 项，超过 5% 阈值。需仓库主管二次确认后方可生成盈亏单据。',['查看差异明细','邀请主管确认'])}
+              ${item('ok','R10','库位锁定状态','盘点期间该仓库无出入库事务，账面数未被改动。')}
+              ${item('ok','R11','单据完整性','已盘库位均有实盘记录，无空值、无重复。')}
+              <div class="check-ft">
+                <button class="ai-btn ghost" data-page="盘点详情">返回继续盘点</button>
+                <button class="ai-btn">提交并生成盈亏单据</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="note" style="margin-top:22px">
+            <b>提交后会发生什么</b>
+            <div>· 无阻断项：提交成功 → 单据状态推进（入库/出库 → 已入库/已出库，盘点 → 已完成）→ 自动返回来源详情页并刷新状态 → 触发 MES / ERP 回传。</div>
+            <div>· 有预警项：填写原因后提交，原因写入审计日志，单据标记「带差异提交」。</div>
+            <div>· 有阻断项：提交按钮置灰，必须修正或拆单；修正后重新进入校验。</div>
+          </div>
+
+          <div class="note" style="margin-top:14px;background:#f7f9fc;border-left-color:#9aa8b5">
+            <b>为什么在提交时校验，而不是扫码时</b>
+            <div>扫码动作每分钟数十次，逐次拦截会拖慢现场节奏且误报频繁；提交前一次性跑完全部规则，能在不打断作业的前提下覆盖所有校验项。规则全部本地计算，LLM 只负责把命中结果写成一句人话。</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>`;
+}};
+
+/* ⑤ AI 效果看板 */
+PAGES['AI 效果看板'] = { group:6, render(){
+  const kpi = (k,v,d,warn) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div><div class="d ${warn?'warn':''}">${d}</div></div>`;
+  const bar = (nm, val) => `<div class="row"><span class="nm">${nm}</span>
+      <div style="height:8px;background:#eef3f8;border-radius:4px;overflow:hidden"><div style="width:${val}%;height:8px;background-color:#1891ff;border-radius:4px"></div></div>
+      <span class="pct">${val}%</span></div>`;
+  return `<div class="pc">
+    ${topbar(6)}
+    <div class="pc-body">
+      ${subnav(6,'AI 效果看板')}
+      <section class="content">
+        ${crumb(['AI 建议层','AI 效果看板'])}
+        <div class="page">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#16283a">近 30 天 AI 建议效果</div>
+              <div style="font-size:12px;color:#8b96a2;margin-top:5px">2026-09-28 ~ 2026-10-27 · 仅统计已采纳与已拒绝的展示记录</div>
+            </div>
+            <span class="ai-tag">数据每 2 小时刷新</span>
+          </div>
+
+          <div class="kpis">
+            ${kpi('建议总展示','18,420','较上周期 +12%')}
+            ${kpi('整体采纳率','71.4%','高于目标线 60%')}
+            ${kpi('找位时长','−34%','由 4.2min 降至 2.8min')}
+            ${kpi('拣货行走','−22%','日均少走 3.4km')}
+          </div>
+
+          <div style="display:flex;gap:18px;align-items:flex-start">
+            <div class="panel" style="flex:1 1 0;min-width:0;margin:0">
+              <div class="panel-title">各场景采纳率</div>
+              <div class="hbar">
+                ${bar('库位推荐', 68)}
+                ${bar('拣货路径', 79)}
+                ${bar('提交前校验', 84)}
+                ${bar('智能问数（复访）', 62)}
+              </div>
+              <div style="font-size:11.5px;color:#9aa8b5;line-height:1.8;padding-top:6px">
+                采纳率 &lt; 30% 的建议类型将自动下线复核；当前无触发。
+              </div>
+            </div>
+
+            <div class="panel" style="flex:1 1 0;min-width:0;margin:0">
+              <div class="panel-title">校验拦截有效性</div>
+              <div class="hbar">
+                ${bar('R1 数量偏差', 76)}
+                ${bar('R2 重复扫码', 92)}
+                ${bar('R4 超收', 88)}
+                ${bar('R7 供应商风险', 41)}
+              </div>
+              <div style="font-size:11.5px;color:#9aa8b5;line-height:1.8;padding-top:6px">
+                R7 误报偏高（41%），下周期调整不合格率阈值。
+              </div>
+            </div>
+          </div>
+
+          <div class="note" style="margin-top:20px">
+            <b>怎么看这张表</b>
+            <div>采纳率高不代表建议对，只代表人愿意点。真正的效果要看「找位时长」与「拣货行走距离」这两个结果指标是否同步下降——如果采纳率涨而指标不动，说明建议只是顺从了人的既有习惯，没有产生增量。</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>`;
+}};
+
+/* 登录页放在最前面 */
+const ORDER = ['登录页面',
+  '成品库存明细','物料库存明细',
+  '产品出入库查询','物料出入库查询',
+  '产品入库','采购入库','生产退料','盘盈入库','入库详情',
+  '销售出库','领料出库','盘亏出库','出库详情',
+  '来料检验','物料盘点','盘点详情','物料移位',
+  '仓库管理','库位管理','条码管理',
+  '智能问数','库位推荐（APP）','拣货路径（APP）','提交前校验','AI 效果看板',
+  'APP 主页','APP 产品入库','APP 产品入库详情','APP 采购入库','APP 来料验收',
+  'APP 入库作业','APP 出库作业','APP 库内作业'
+];
+
+/* =========================================================
+   渲染与交互
+   ========================================================= */
+let current = '登录页面';
+const closed = new Set();
+
+function buildTree(){
+  let html = '';
+  html += `<div class="node lv2 ${current==='登录页面'?'active':''}" data-page="登录页面" style="padding-left:14px">登录页面</div>`;
+
+  NAV.forEach((g, gi)=>{
+    const isClosed = closed.has(gi);
+    html += `<div class="node lv1 ${isClosed?'closed':''}" data-grp="${gi}"><span class="tri">▼</span>${g.label}</div>`;
+    html += `<div class="grp-body ${isClosed?'hide':''}" data-body="${gi}">`;
+    g.items.forEach(it=>{
+      if (!PAGES[it]) return;
+      html += `<div class="node lv2 ${current===it?'active':''}" data-page="${it}">${it}</div>`;
+    });
+    html += `</div>`;
+  });
+  $('#tree').innerHTML = html;
+  $('#pcount').textContent = ORDER.length + ' 屏';
+}
+
+function render(){
+  const page = PAGES[current];
+  if (!page) return;
+  $('#stageTitle').innerHTML = `${current}<span>${page.app ? '移动端' : 'PC 端'}</span>`;
+  $('#stageBody').innerHTML = page.render();
+  buildTree();
+  $('#stageBody').scrollTop = 0;
+}
+
+function go(name){
+  if (!PAGES[name]) return;
+  current = name;
+  history.replaceState(null, '', '#' + encodeURIComponent(name));
+  render();
+}
+
+document.addEventListener('click', e=>{
+  const grp = e.target.closest('[data-grp]');
+  if (grp){
+    const gi = +grp.dataset.grp;
+    closed.has(gi) ? closed.delete(gi) : closed.add(gi);
+    grp.classList.toggle('closed');
+    const body = document.querySelector(`[data-body="${gi}"]`);
+    if (body) body.classList.toggle('hide');
+    return;
+  }
+  const gbtn = e.target.closest('[data-group]');
+  if (gbtn){
+    const gi = +gbtn.dataset.group;
+    const first = NAV[gi].items.find(i=>PAGES[i]);
+    if (first) go(first);
+    return;
+  }
+  const app = e.target.closest('[data-app]');
+  if (app){ go(app.dataset.app); return; }
+
+  const ct = e.target.closest('[data-ct]');
+  if (ct){
+    const key = ct.dataset.ct;
+    document.querySelectorAll('[data-ct]').forEach(t=>t.classList.toggle('on', t===ct));
+    document.querySelectorAll('[data-pane]').forEach(p=>{ p.hidden = p.dataset.pane !== key; });
+    return;
+  }
+
+  const p = e.target.closest('[data-page]');
+  if (p && PAGES[p.dataset.page]){ go(p.dataset.page); return; }
+
+  // 表格里的"入库详情/出库详情/盘点详情"链接
+  const link = e.target.closest('.link');
+  if (link){
+    const t = link.textContent;
+    if (t.includes('入库详情')) go('入库详情');
+    else if (t.includes('出库详情')) go('出库详情');
+    else if (t.includes('盘点详情')) go('盘点详情');
+  }
+});
+
+document.addEventListener('keydown', e=>{
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const i = ORDER.indexOf(current);
+  const n = e.key === 'ArrowRight' ? (i+1) % ORDER.length : (i-1+ORDER.length) % ORDER.length;
+  go(ORDER[n]);
+});
+
+window.addEventListener('hashchange', ()=>{
+  const n = decodeURIComponent(location.hash.slice(1));
+  if (PAGES[n] && n !== current){ current = n; render(); }
+});
+
+const init = decodeURIComponent(location.hash.slice(1));
+if (PAGES[init]) current = init;
+render();
+</script>
+</body>
+</html>
+

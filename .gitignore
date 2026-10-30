@@ -1,0 +1,39 @@
+# ---- 依赖与构建产物 ----
+node_modules
+dist
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.tsbuildinfo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# ---- 密钥与环境（.env.example 是模板，要提交）----
+.env
+.env.*
+!.env.example
+
+# ---- 本地数据库 ----
+*.db
+*.sqlite
+*.sqlite3
+
+# ---- Docker Compose 产生的本地卷 ----
+volumes/
+
+# ---- 日志 ----
+*.log
+logs/
+
+# ---- 系统与 IDE ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# ---- Claude Code 本地状态 ----
+.claude/
+.workbuddy/
