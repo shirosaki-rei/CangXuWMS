@@ -10,7 +10,7 @@ FastAPI + MySQL 8 + Redis + Vue3 单机部署。文档与代码的对应关系�
 | `backend/` | FastAPI 服务（api / service / domain 分层） |
 | `frontend/` | Vue3 + Vite + Element Plus + Pinia 管理端 |
 | `nginx/` | 静态托管 + 反代配置 |
-| `tools/` | E2E 冒烟脚本（Chrome CDP） |
+| `tools/` | E2E 冒烟脚本（Chrome CDP）与编码器自检 |
 
 ---
 
@@ -72,6 +72,8 @@ PYTHONPATH=. ./.venv/Scripts/python.exe tools/reset_db.py
 cd .. && node tools/e2e-smoke.mjs /tmp/e2e                             # B01：登录 → 基础资料 → 权限
 cd .. && node tools/e2e-b02.mjs /tmp/b02                               # B02：检验→扫码→提交→库存守恒
 cd .. && node tools/e2e-b03.mjs /tmp/b03                               # B03：FIFO→离线补传→提交→库存守恒
+cd .. && node tools/e2e-print.mjs /tmp/print                           # 条码批量打印预览
+cd .. && node tools/check-code39.mjs                                   # Code 39 编码器自检（含反向解码）
 ```
 
 - 单测默认用 SQLite 文件库，零外部依赖；

@@ -234,7 +234,12 @@ def create_barcode(db: Session, data: BarcodeIn) -> int:
 
 
 def print_barcodes(db: Session, ids: list[int], spec: str, copies: int) -> dict:
-    """I-03：服务端生成 PDF 与浏览器直连打印机两端都留口，这里先返回待打印清单。"""
+    """批量打印（接口 46 / I-03）。
+
+    走「浏览器直连标签机」模式：服务端只返回标签内容与规格，由前端渲染条码
+    并调 `window.print()`，走操作系统打印机驱动。服务端 PDF 是对接存档用的，
+    且猜不准对方用哪款标签机，所以不在这里生成。
+    """
     rows = db.execute(select(Barcode).where(Barcode.id.in_(ids))).scalars().all()
     if not rows:
         raise BizError(Codes.BAD_REQUEST, "没有选中的条码")
@@ -242,9 +247,8 @@ def print_barcodes(db: Session, ids: list[int], spec: str, copies: int) -> dict:
         "spec": spec,
         "copies": copies,
         "total": len(rows) * copies,
+        "mode": "browser",
         "items": [{"code": b.code, "type": b.type} for b in rows],
-        # ponytail: 真 PDF 生成（reportlab）等 B03 有打印机联调时再加，先返回结构化数据
-        "pdf_url": None,
     }
 
 

@@ -408,5 +408,5 @@ X-Sign: hex(hmac_sha256(app_secret, app_key + timestamp + body_raw))
 |---|---|---|---|
 | I-01 | MES / ERP 回调地址与字段由对方提供，`sys_config` 配置项名需与对方约定 | 63 / 64 | 按 4.6 实现，地址留配置 |
 | I-02 | `sys_config.scope` 的 GLOBAL / SUPPLIER 两级是否够用（供应商级超收阈值已覆盖） | 47 / 51 | 按两级实现，不够再加 WAREHOUSE 级 |
-| I-03 | 标签打印走「服务端生成 PDF」还是「浏览器直连打印机」 | 46 | 两端都实现，客户端可选 |
+| I-03 | 标签打印走「服务端生成 PDF」还是「浏览器直连打印机」 | 46 | **已决策**：只做「浏览器直连打印机」。服务端只返回标签内容与规格（`mode: "browser"`），条码由前端渲染成 Code 39 SVG 后 `window.print()`，走操作系统打印机驱动。服务端 PDF 是对接存档用的，且猜不准对方标签机型号，暂不做 |
 | I-04 | 集成端签名是否改用 OAuth2 client_credentials | 4.1 | 先按 HMAC，改造只影响中间件 |
