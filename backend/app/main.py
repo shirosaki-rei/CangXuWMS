@@ -8,12 +8,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app.api.v1 import admin, auth, base_data
+from app.api.v1 import admin, auth, base_data, inbound, inspection, integration, inventory
 from app.core.config import settings
 from app.core.db import SessionLocal, engine
 from app.core.errors import Codes, ok, register_error_handlers
 from app.core.logging import get_logger, setup_logging
 from app.middleware.idempotency import IdempotencyMiddleware
+from app.middleware.raw_body import RawBodyMiddleware
 from app.middleware.trace import TraceMiddleware
 from app.core.redis import rds
 
@@ -41,9 +42,10 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
     )
 
-    # 中间件顺序：后添加的先执行 → Trace 最外层，幂等在里层
+    # 中间件顺序：后添加的先执行 → Trace 最外层，原始 body 缓存最靠内（只对 /integration/）
     app.add_middleware(IdempotencyMiddleware)
     app.add_middleware(TraceMiddleware)
+    app.add_middleware(RawBodyMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -61,6 +63,10 @@ def create_app() -> FastAPI:
     app.include_router(base_data.loc_router, prefix=prefix)
     app.include_router(base_data.bar_router, prefix=prefix)
     app.include_router(admin.router, prefix=prefix)
+    app.include_router(inventory.router, prefix=prefix)
+    app.include_router(inspection.router, prefix=prefix)
+    app.include_router(inbound.router, prefix=prefix)
+    app.include_router(integration.router, prefix=prefix)
 
     @app.get("/health", tags=["运维"], summary="健康检查（T-00-1 交付物）")
     def health(request: Request) -> dict:

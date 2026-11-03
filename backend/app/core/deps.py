@@ -74,6 +74,9 @@ def require(*perms: str):
 AdminUser = Annotated[User, Depends(require("system:manage"))]
 BaseDataAdmin = Annotated[User, Depends(require("basedata:manage"))]
 BaseDataViewer = Annotated[User, Depends(require("basedata:view"))]
+InventoryViewer = Annotated[User, Depends(require("inventory:view"))]
+InspectorUser = Annotated[User, Depends(require("inspection:judge"))]
+InboundVoidUser = Annotated[User, Depends(require("inbound:void"))]
 
 
 def get_warehouse_scope(user: CurrentUser, db: DbDep) -> list[int] | None:

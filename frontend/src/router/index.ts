@@ -28,6 +28,48 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '条码管理', perm: 'basedata:view' },
       },
       {
+        path: 'inventory/product',
+        name: 'inventory-product',
+        component: () => import('@/views/inventory/ProductStockList.vue'),
+        meta: { title: '成品库存明细', perm: 'inventory:view' },
+      },
+      {
+        path: 'inventory/material',
+        name: 'inventory-material',
+        component: () => import('@/views/inventory/MaterialStockList.vue'),
+        meta: { title: '物料库存明细', perm: 'inventory:view' },
+      },
+      {
+        path: 'txn/product',
+        name: 'txn-product',
+        component: () => import('@/views/inventory/TxnList.vue'),
+        meta: { title: '产品出入库查询', perm: 'inventory:view' },
+      },
+      {
+        path: 'txn/material',
+        name: 'txn-material',
+        component: () => import('@/views/inventory/TxnList.vue'),
+        meta: { title: '物料出入库查询', perm: 'inventory:view' },
+      },
+      {
+        path: 'inbound',
+        name: 'inbound',
+        component: () => import('@/views/inbound/InboundList.vue'),
+        meta: { title: '入库管理', perm: 'inventory:view' },
+      },
+      {
+        path: 'inbound/:id',
+        name: 'inbound-detail',
+        component: () => import('@/views/inbound/InboundDetail.vue'),
+        meta: { title: '入库详情', perm: 'inventory:view' },
+      },
+      {
+        path: 'inspection',
+        name: 'inspection',
+        component: () => import('@/views/inbound/InspectionList.vue'),
+        meta: { title: '来料检验', perm: 'inventory:view' },
+      },
+      {
         path: 'system/user',
         name: 'user',
         component: () => import('@/views/system/UserList.vue'),

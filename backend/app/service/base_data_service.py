@@ -14,9 +14,11 @@ from app.core.errors import BizError, Codes
 from app.domain.enums import LocationStatus, Switch
 from app.domain.models import (
     Barcode,
+    InboundItem,
     InboundOrder,
     Inventory,
     Location,
+    OutboundItem,
     OutboundOrder,
     Warehouse,
 )
@@ -247,7 +249,11 @@ def print_barcodes(db: Session, ids: list[int], spec: str, copies: int) -> dict:
 
 
 def location_blockers(db: Session, warehouse_id: int) -> list[str]:
-    """停用仓库时的阻塞项清单，前端直接展示。"""
+    """停用仓库时的阻塞项清单（BR-014）。
+
+    未结单据按「明细的目的库位落在本仓」归属——inbound_order 没有 warehouse_id 字段，
+    只能从 inbound_item.location_id 反推。还没分配库位的单据不归任何仓，不算阻塞。
+    """
     blockers: list[str] = []
     qty = db.execute(
         select(func.coalesce(func.sum(Inventory.qty), 0))
@@ -256,16 +262,25 @@ def location_blockers(db: Session, warehouse_id: int) -> list[str]:
     ).scalar()
     if qty:
         blockers.append(f"仓内仍有库存 {int(qty)} 件")
-    open_in = int(
-        db.execute(
-            select(func.count()).select_from(InboundOrder).where(InboundOrder.status.in_(("PENDING", "PARTIAL")))
-        ).scalar()
+
+    loc_ids = list(
+        db.execute(select(Location.id).where(Location.warehouse_id == warehouse_id)).scalars()
     )
-    open_out = int(
-        db.execute(
-            select(func.count()).select_from(OutboundOrder).where(OutboundOrder.status.in_(("PENDING", "PARTIAL")))
-        ).scalar()
-    )
-    if open_in or open_out:
-        blockers.append(f"未结入库单 {open_in} 张、未结出库单 {open_out} 张")
+    if loc_ids:
+        open_in = int(db.execute(
+            select(func.count(func.distinct(InboundOrder.id)))
+            .select_from(InboundOrder)
+            .join(InboundItem, InboundItem.order_id == InboundOrder.id)
+            .where(InboundOrder.status.in_(("PENDING", "PARTIAL")),
+                   InboundItem.location_id.in_(loc_ids))
+        ).scalar())
+        open_out = int(db.execute(
+            select(func.count(func.distinct(OutboundOrder.id)))
+            .select_from(OutboundOrder)
+            .join(OutboundItem, OutboundItem.order_id == OutboundOrder.id)
+            .where(OutboundOrder.status.in_(("PENDING", "PARTIAL")),
+                   OutboundItem.location_id.in_(loc_ids))
+        ).scalar())
+        if open_in or open_out:
+            blockers.append(f"未结入库单 {open_in} 张、未结出库单 {open_out} 张")
     return blockers

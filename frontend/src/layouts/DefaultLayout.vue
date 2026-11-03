@@ -24,6 +24,27 @@ const groups = computed<MenuGroup[]>(() => {
   const out: MenuGroup[] = [
     { name: '工作台', items: [{ path: '/dashboard', title: '首页' }] },
     {
+      name: '实时库存查询',
+      items: [
+        { path: '/inventory/product', title: '成品库存明细', perm: 'inventory:view' },
+        { path: '/inventory/material', title: '物料库存明细', perm: 'inventory:view' },
+      ].filter((i) => can(i.perm)),
+    },
+    {
+      name: '出入库查询',
+      items: [
+        { path: '/txn/product', title: '产品出入库查询', perm: 'inventory:view' },
+        { path: '/txn/material', title: '物料出入库查询', perm: 'inventory:view' },
+      ].filter((i) => can(i.perm)),
+    },
+    {
+      name: '入库管理',
+      items: [
+        { path: '/inbound', title: '入库单', perm: 'inventory:view' },
+        { path: '/inspection', title: '来料检验', perm: 'inventory:view' },
+      ].filter((i) => can(i.perm)),
+    },
+    {
       name: '基础设置',
       items: [
         { path: '/basedata/warehouse', title: '仓库管理', perm: 'basedata:view' },

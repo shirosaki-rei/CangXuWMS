@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -19,6 +20,10 @@ from app.core.security import hash_password
 from app.domain.models import (
     ApiClient,
     Barcode,
+    InboundItem,
+    InboundOrder,
+    Inspection,
+    InspectionItem,
     Location,
     Material,
     Product,
@@ -104,7 +109,8 @@ def _locations_for(warehouse_id: int, prefix: str, count: int, dangerous: bool =
 
 def seed(session: Session) -> dict:
     stats = {"warehouse": 0, "location": 0, "material": 0, "product": 0,
-             "supplier": 0, "user": 0, "barcode": 0, "sys_config": 0, "api_client": 0}
+             "supplier": 0, "user": 0, "barcode": 0, "sys_config": 0, "api_client": 0,
+             "inspection": 0, "inbound_order": 0}
 
     def has(model, **kw) -> bool:
         return session.execute(select(model).filter_by(**kw)).first() is not None
@@ -204,6 +210,56 @@ def seed(session: Session) -> dict:
         session.add(ApiClient(app_key="mes-prod", app_secret="mes-secret-change-me",
                               name="MES 生产系统", source="MES"))
         stats["api_client"] += 1
+
+    # 来料检验单：一条待检、一条已检合格（后者可直接生成采购入库单）
+    if not has(Inspection, no="JY20260127001"):
+        sup_id = session.execute(
+            select(Supplier.id).where(Supplier.code == "GYS-ZTE-001")
+        ).scalar_one()
+        mat_id = session.execute(
+            select(Material.id).where(Material.code == "BAT-LIPO-4500-003")
+        ).scalar_one()
+        insp = Inspection(no="JY20260127001", supplier_id=sup_id,
+                          logistics_no="WL20260127001", plate_no="京A12345",
+                          status="PENDING", plan_qty=500, actual_qty=0, creator_id=1)
+        session.add(insp)
+        session.flush()
+        session.add(InspectionItem(inspection_id=insp.id, material_id=mat_id,
+                                   plan_qty=500, actual_qty=0))
+        stats["inspection"] = stats.get("inspection", 0) + 1
+
+    if not has(Inspection, no="JY20260127002"):
+        sup_id = session.execute(
+            select(Supplier.id).where(Supplier.code == "GYS-BYD-002")
+        ).scalar_one()
+        mat_id = session.execute(
+            select(Material.id).where(Material.code == "DSP-AMOLED-67-FULL")
+        ).scalar_one()
+        insp = Inspection(no="JY20260127002", supplier_id=sup_id,
+                          logistics_no="WL20260127002", plate_no="京B66666",
+                          status="DONE", result="PASS", plan_qty=200, actual_qty=200,
+                          creator_id=1, checked_at=datetime(2026, 1, 27, 14, 0, 0))
+        session.add(insp)
+        session.flush()
+        session.add(InspectionItem(inspection_id=insp.id, material_id=mat_id,
+                                   plan_qty=200, actual_qty=200, qualified=True))
+        stats["inspection"] = stats.get("inspection", 0) + 1
+
+    # 采购入库单：关联已检合格的检验单，待入库
+    if not has(InboundOrder, no="PR20260127001"):
+        sup_id = session.execute(
+            select(Supplier.id).where(Supplier.code == "GYS-BYD-002")
+        ).scalar_one()
+        mat_id = session.execute(
+            select(Material.id).where(Material.code == "DSP-AMOLED-67-FULL")
+        ).scalar_one()
+        order = InboundOrder(no="PR20260127001", type="PURCHASE",
+                             source_no="JY20260127002", supplier_id=sup_id,
+                             status="PENDING", plan_qty=200, actual_qty=0, creator_id=1)
+        session.add(order)
+        session.flush()
+        session.add(InboundItem(order_id=order.id, sku_id=mat_id, qty=0))
+        stats["inbound_order"] = stats.get("inbound_order", 0) + 1
 
     session.commit()
     return stats

@@ -7,7 +7,7 @@ import uuid
 
 from app.core.db import SessionLocal
 from app.core.redis import rds
-from app.domain.models import InboundOrder
+from app.domain.models import InboundItem, InboundOrder
 from app.domain.stock import Move, apply_many
 
 from tests.conftest import login
@@ -92,6 +92,7 @@ def test_编辑仓库(client, ah):
 
 
 def test_停用仓库_BR014_无阻塞可停(client, ah, wh1_id):
+    """种子里的 PR 单还没分配库位，不归任何仓，不该挡住停用。"""
     r = client.post(f"/api/v1/warehouses/{wh1_id}/toggle",
                     headers={**ah, "X-Client-Op-Id": op_id()}, json={"status": "DISABLED"})
     assert r.json()["code"] == "0"
@@ -99,10 +100,15 @@ def test_停用仓库_BR014_无阻塞可停(client, ah, wh1_id):
     assert next(i for i in items if i["id"] == wh1_id)["status"] == "DISABLED"
 
 
-def test_停用仓库_BR014_有未结单据被拒并列出阻塞项(client, ah, wh1_id, admin_id):
+def test_停用仓库_BR014_有未结单据被拒并列出阻塞项(client, ah, wh1_id, wh1_location_id,
+                                                    admin_id):
     with SessionLocal() as s:
-        s.add(InboundOrder(no="PR20260130001", type="PURCHASE", status="PENDING",
-                           plan_qty=100, creator_id=admin_id))
+        o = InboundOrder(no="PR20260130001", type="PURCHASE", status="PENDING",
+                         plan_qty=100, creator_id=admin_id)
+        s.add(o)
+        s.flush()
+        # 明细的目的库位落在 WH-001，才构成对 WH-001 的阻塞
+        s.add(InboundItem(order_id=o.id, sku_id=1, qty=10, location_id=wh1_location_id))
         s.commit()
     r = client.post(f"/api/v1/warehouses/{wh1_id}/toggle",
                     headers={**ah, "X-Client-Op-Id": op_id()}, json={"status": "DISABLED"})

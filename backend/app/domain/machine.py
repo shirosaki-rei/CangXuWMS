@@ -69,13 +69,16 @@ def can_transit(doc_type: str, cur: str, nxt: str) -> bool:
 
 
 def transit(doc_type: str, cur: str, nxt: str, *, reason: str | None = None) -> str:
-    """校验并返回新状态。非法迁移抛 WMS-4221；作废缺原因抛 WMS-4001。"""
+    """校验并返回新状态。非法迁移抛 WMS-4221；作废缺原因抛 WMS-4001。
+
+    顺序很重要：终态校验必须在「同态直接返回」之前，否则终态单据可以被反复作废。
+    """
     if not known(doc_type):
         raise BizError(Codes.SERVER_ERROR, f"未登记的单据类型 {doc_type}")
-    if cur == nxt:
-        return cur
     if is_terminal(doc_type, cur):
         raise BizError(Codes.ORDER_CLOSED, f"单据已终态（{cur}），不可再变更")
+    if cur == nxt:
+        return cur
     if not can_transit(doc_type, cur, nxt):
         raise IllegalTransition(doc_type, cur, nxt)
     if nxt in _VOID_STATES and doc_type in _VOID_TYPES and not (reason or "").strip():
@@ -121,6 +124,13 @@ def _self_check() -> None:  # pragma: no cover - `python -m app.domain.machine` 
         pass
     else:
         raise AssertionError("盘点回退未拦截")
+    # 终态同态（已作废再作废）必须被终态校验拦住，不能被「同态直接返回」放过
+    try:
+        transit("INBOUND", "VOID", "VOID", reason="再作废")
+    except E as e:
+        assert e.code == Codes.ORDER_CLOSED, "终态同态必须报 4092"
+    else:
+        raise AssertionError("终态同态未拦截")
     print("machine self-check ok")
 
 

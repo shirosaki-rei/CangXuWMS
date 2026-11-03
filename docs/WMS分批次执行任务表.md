@@ -77,6 +77,31 @@ B01-1 骨架 ──┬─> B01-2 compose ──> B01-3 建表+seed ──┬─>
 |---|---|---|
 | U-02 | ~~Docker 守护进程未启动~~ **已解决**：启动 Docker Desktop 后 `docker compose up --build` 通过。修掉两处 compose 写法错误——`environment:` 里误用 `$$` 转义（变成字面量 `${MYSQL_USER}`）、mysql healthcheck 用 exec 形式导致 `$$` 不被展开（改 `CMD-SHELL`）。另删掉 Dockerfile 的 `# syntax=` 行，它要拉 frontend 镜像，国内网络不稳 |
 
+## 1.3 B02 验收结果（2026-11-03，MySQL 实测通过）
+
+对应 T-01-1~6 + T-00-12。
+
+| 项 | 结果 |
+|---|---|
+| 后端单测 · SQLite | **221 passed, 2 skipped** |
+| 后端单测 · **MySQL 8.0** | **223 passed, 0 skipped** |
+| 全链路 E2E（`tools/e2e-b02.mjs`，Chrome CDP） | **17/17 通过**：登录 → 三个库存/流水页 → 取检验单 → 扫码 300 → 判定合格 → 生成采购入库单 → 取库位 → 扫码收货 → 提交落库 → **库存守恒 +300** → 流水结存一致 → 三个页面走查 |
+| 前端 | `vue-tsc` 零错误，`npm run build` 通过 |
+
+新增接口：4/5/6/25（库存与流水 + 导出）、7/8/26/27/37（入库单）、11/12/34/35/36（来料检验）、62（MES 推送）。
+新增页面：P01/P02/P03/P04、P05–P09（入库列表 + 详情）、P14（来料检验）。
+
+### 实施中修掉的六个真问题
+
+1. **扫码到计划数就把单子推到 `DONE`**，提交时反被「已终态」挡住。改为扫码只推进到 `PARTIAL`，`DONE` 由 `submit` 独占——PRD 第 9 章状态图与接口 27 是两个动作，同时生效会死锁。
+2. **`transit()` 的「同态直接返回」写在终态校验之前**，已作废的单能被反复作废。调整顺序并补自检。
+3. **作废接口漏了角色守卫**（用了 `CurrentUser`），仓管员也能作废。按 PRD 3.2 加 `inbound:void`。
+4. **`over_receive_ratio` 只读 `sys_config`**，没读供应商档案的覆盖值。BR-023 明确覆盖优先，改为先查 `supplier.over_receive`。
+5. **`gen-inbound` 的 body 全可选字段却仍要求必须有 body**，空 body 直接被 4001 挡掉。改为 `| None = None`。
+6. **`get_order` 查 SKU 编码没按单据的 sku_type 选表**，成品与物料共用自增 id，采购单显示成了成品编码。截图里能直接看出来。
+
+另有两处测试自身的坑：SQLite 重建表后自增归零，让「仓库 id 当库位 id 用」恰好成立，MySQL 上静默跑错；`location_blockers` 原先把全局未结单据都算作本仓阻塞项，改为按明细目的库位归属。
+
 ## 2. 批次门禁（DoD，每批次通用）
 
 沿用任务清单第 9 章，另加三条本表专用：
@@ -101,4 +126,32 @@ B01-1 骨架 ──┬─> B01-2 compose ──> B01-3 建表+seed ──┬─>
 | B01-G | AI 只读连接池（架构 8.1 第一道锁）未建 | B01 没有 AI 模块，建了只是白开一个连接池 | B05 / T-04-1 与三道锁一起建 |
 | B01-H | `sys_config` 的 `SUPPLIER` 级只实现了读写，未接校验规则 | 校验引擎在 B05 / T-04-4 | B05 接入 `check_over_receive` |
 | B01-J | 测试用 `truncate_all` 放在 `tests/conftest.py` 而非 `app/core/db.py` | 清数据是测试行为，不该进生产代码；且标识符引号要按方言来（MySQL 不认双引号） | 无 |
-| B01-J | `# syntax=docker/dockerfile:1` 从 Dockerfile 删除 | 该行会额外拉 `docker/dockerfile:1` frontend 镜像，网络不稳时直接卡死构建；本用到的都是稳定语法 | 无 |
+| B01-K | `# syntax=docker/dockerfile:1` 从 Dockerfile 删除 | 该行会额外拉 `docker/dockerfile:1` frontend 镜像，网络不稳时直接卡死构建；本用到的都是稳定语法 | 无 |
+| B02-A | 扫码收货只推进到 `PARTIAL`，不按 PRD 状态图直接到 `DONE` | 接口 27 定义了独立的「提交入库」动作（落库 + 校验），两个都生效会死锁 | 若产品要求「扫满即完成」，需先去掉 submit 或把它改成可选 |
+| B02-B | 导出走同步流式 CSV，没做「任务号 + 轮询」的异步导出 | 日均 800–2000 单下 5 万行 CSV 几 MB，一个请求扛得住；超过 5 万行直接报错让缩小范围 | 出现请求超时再拆异步（B06 接 APScheduler） |
+| B02-C | 集成端原始 body 用纯 ASGI 中间件缓存，只对 `/api/v1/integration/` 生效 | BaseHTTPMiddleware 会缓冲整个响应体并吃掉 body；纯 ASGI 只在该前缀动手，其余路由零开销 | 无 |
+| B02-D | 提交前校验（X04）未接入 submit | 校验引擎在 B05 / T-04-4；B02 只做落库前的最小校验（库位、差异原因、BR-004） | B05 接入后 submit 前先跑 `check_engine.run()` |
+| B02-E | APP 端页面（A02–A05）未做 | T-01-7 的 Expo 骨架在任务清单里但没归入任何批次，见第 4 章 | B03 前补一批 APP 骨架 |
+
+## 4. T-01-7 的归属（B02 复盘时发现的漏洞）
+
+原《WMS开发任务清单.md》第 2 章的 T-01-7「APP 骨架：Expo + RN 导航 + SQLite 队列 + 扫码（PDA 打样放第一周）」估 8d，
+在最初分批时漏掉了——它不在 B01–B06 任何一批里，但 B03 的 T-02-2（扫码拣货 A07/A08）和 B04 的 T-03-6
+（APP 剩余页 A06/A07/A09）都依赖它。
+
+**处理：前移到 B03 第一周。** 理由：
+
+1. 不补这个洞，B03 的 APP 页面会直接卡住；
+2. 任务清单自己标了「PDA 打样放第一周」——工业 PDA 的扫码兼容性是要尽早发现的风险
+   （若 Expo 不兼容需退 Expo 或加 config plugin，代价 5–10d），越晚做越贵；
+3. B02 的入库闭环已把服务端契约跑通，APP 侧照抄同一套 `client_op_id` 幂等协议即可。
+
+**B03 新增任务**：
+
+| # | 任务 | 交付物 | 对应 T | 完成标准 |
+|---|---|---|---|---|
+| B03-0 | APP 骨架：Expo + RN 导航 + SQLite 队列 + 扫码（**PDA 打样放第一周**） | `mobile/` 可扫码的空 APP | T-01-7 | 真机扫得出码；离线入队、恢复网络后能补传 |
+| B03-0.1 | APP 请求层复用 PC 端同一套幂等协议 | `mobile/src/api` | — | 断网扫码 → 本地队列 → `/sync/push` 逐条返回 OK/DUPLICATE/FAILED |
+
+> **风险前置**：B03 第一周必须出 PDA 打样结论。不兼容就要动技术选型，那是 5–10d 的代价，
+> 不能等到 B03 末才发现。
