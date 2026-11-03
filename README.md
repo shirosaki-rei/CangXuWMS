@@ -9,6 +9,7 @@ FastAPI + MySQL 8 + Redis + Vue3 单机部署。文档与代码的对应关系�
 | `docs/` | PRD、架构设计、接口契约、开发任务清单、**分批次执行任务表** |
 | `backend/` | FastAPI 服务（api / service / domain 分层） |
 | `frontend/` | Vue3 + Vite + Element Plus + Pinia 管理端 |
+| `mobile/` | 仓储作业 APP（Expo + React Native + SQLite 离线队列） |
 | `nginx/` | 静态托管 + 反代配置 |
 | `tools/` | E2E 冒烟脚本（Chrome CDP）与编码器自检 |
 
@@ -41,6 +42,12 @@ python -m venv .venv
 cd frontend
 npm install
 npm run dev                                                      # :5173，/api 已代理到 8000
+
+# 移动端（需真机或模拟器）
+cd mobile
+npm install
+EXPO_PUBLIC_API_BASE=http://<你的局域网 IP>:8000/api/v1 npx expo start
+# 手机装 Expo Go 扫码打开；工业 PDA 需在「诊断」页确认摄像头/键盘楔入是否可用
 ```
 
 没有 MySQL/Redis 也能跑：把 `backend/.env` 的 `DB_URL` 改成 `sqlite:///./dev.db`，
@@ -74,6 +81,7 @@ cd .. && node tools/e2e-b02.mjs /tmp/b02                               # B02：�
 cd .. && node tools/e2e-b03.mjs /tmp/b03                               # B03：FIFO→离线补传→提交→库存守恒
 cd .. && node tools/e2e-print.mjs /tmp/print                           # 条码批量打印预览
 cd .. && node tools/check-code39.mjs                                   # Code 39 编码器自检（含反向解码）
+cd .. && node tools/check-mobile-queue.mjs                             # 移动端队列分批/归类/幂等键自检
 ```
 
 - 单测默认用 SQLite 文件库，零外部依赖；
@@ -116,6 +124,21 @@ backend/app/
 ```
 
 ---
+
+## 移动端（骨架）
+
+`mobile/` 目前只交付**骨架 + 扫码打样**，不含业务页：
+
+| 页面 | 作用 |
+|---|---|
+| 登录 | 账号密码 + 图形验证码；服务器地址可改并持久化 |
+| 工作台 | 入口宫格 + 待同步角标 |
+| 扫码 | **摄像头**与**键盘楔入**两种模式；扫到即入队并尽力同步 |
+| 待同步 | 本地 SQLite 队列，手动同步 / 重试失败项 |
+| 诊断 | 打样自检：环境、SQLite、SecureStore、摄像头权限、接口可达 |
+
+离线优先：每次扫码先写本地队列（`client_op_id` 入队时定死），再尝试 POST `/sync/push`，
+断网也照常作业，恢复网络后按扫码顺序补传。
 
 ## 关键约定
 

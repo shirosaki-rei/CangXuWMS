@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "仓序 WMS",
+    "slug": "cangxu-wms",
+    "version": "0.1.0",
+    "scheme": "cangxuwms",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#0d5bb5",
+      "resizeMode": "contain",
+      "image": "./assets/splash-icon.png"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.cangxu.wms"
+    },
+    "android": {
+      "package": "com.cangxu.wms",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "扫码收货需要使用摄像头",
+          "recordAudioAndroid": false
+        }
+      ]
+    ]
+  }
+}
