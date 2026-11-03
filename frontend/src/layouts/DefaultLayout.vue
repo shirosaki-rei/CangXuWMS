@@ -45,6 +45,12 @@ const groups = computed<MenuGroup[]>(() => {
       ].filter((i) => can(i.perm)),
     },
     {
+      name: '出库管理',
+      items: [
+        { path: '/outbound', title: '出库单', perm: 'inventory:view' },
+      ].filter((i) => can(i.perm)),
+    },
+    {
       name: '基础设置',
       items: [
         { path: '/basedata/warehouse', title: '仓库管理', perm: 'basedata:view' },

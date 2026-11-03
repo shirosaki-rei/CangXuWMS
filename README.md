@@ -62,12 +62,16 @@ Redis 连不上会自动退化到进程内实现（仅单进程开发可用，�
 
 ```bash
 cd backend
-./.venv/Scripts/python.exe -m pytest                                   # SQLite：221 passed, 2 skipped
+./.venv/Scripts/python.exe -m pytest                                   # SQLite：256 passed, 2 skipped
 DB_URL="mysql+pymysql://wms:wms123456@127.0.0.1:3306/wms?charset=utf8mb4" \
-  ./.venv/Scripts/python.exe -m pytest                                 # MySQL：223 passed, 0 skipped
+  ./.venv/Scripts/python.exe -m pytest                                 # MySQL：258 passed, 0 skipped
+
+# 跑 E2E 前先重置库：脚本扫的是种子单据，跑过一次后状态已变，而 seed 是幂等的不会重置
+PYTHONPATH=. ./.venv/Scripts/python.exe tools/reset_db.py
 
 cd .. && node tools/e2e-smoke.mjs /tmp/e2e                             # B01：登录 → 基础资料 → 权限
 cd .. && node tools/e2e-b02.mjs /tmp/b02                               # B02：检验→扫码→提交→库存守恒
+cd .. && node tools/e2e-b03.mjs /tmp/b03                               # B03：FIFO→离线补传→提交→库存守恒
 ```
 
 - 单测默认用 SQLite 文件库，零外部依赖；
@@ -96,7 +100,7 @@ backend/app/
 │   ├── permissions.py   # 权限矩阵（PRD 3.2），前后端共用
 │   ├── redis.py         # Redis 客户端 + 进程内兜底
 │   └── db.py            # 写连接 / 只读连接
-├── api/v1/              # auth / base_data / admin / inventory / inbound / inspection / integration
+├── api/v1/              # auth / base_data / admin / inventory / inbound / inspection / integration / outbound / sync
 ├── domain/
 │   ├── models.py        # 30 张表（架构 6.2）
 │   ├── enums.py
@@ -105,7 +109,7 @@ backend/app/
 │   └── rules.py         # BR-008/013/014/023/025 等纯规则
 ├── middleware/          # trace_id 贯穿、幂等、集成端原始 body 缓存
 ├── core/integration_auth.py  # HMAC-SHA256 签名（接口 4.1）
-├── service/             # auth / base_data / admin / inventory / inbound / inspection
+├── service/             # auth / base_data / admin / inventory / inbound / inspection / outbound / sync
 └── seed.py              # 种子数据（幂等，可重复执行）
 ```
 

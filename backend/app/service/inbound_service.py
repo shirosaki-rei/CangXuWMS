@@ -178,15 +178,21 @@ def get_order(db: Session, order_id: int) -> dict:
 
 
 # ---------------------------------------------------------------- 扫码收货
-def _check_location(db: Session, location_id: int, sku_id: int | None) -> Location:
-    """BR-013：危品库位只能放危品、恒温库位只能放控温物料；锁定/维保中不能上架。"""
+def _check_location(db: Session, location_id: int, sku_id: int | None,
+                    order_type: str) -> Location:
+    """BR-013：危品库位只能放危品、恒温库位只能放控温物料；锁定/维保中不能上架。
+
+    只在**物料**入库单上做属性匹配——成品单的 sku_id 是 product.id，
+    拿它去查 material 表会撞上同 id 的物料（两个表共用一套自增 id），
+    于是成品单会被错误地按物料规则拦下来。
+    """
     loc = db.get(Location, location_id)
     if loc is None:
         raise BizError(Codes.BAD_REQUEST, "库位不存在")
     if loc.status in (LocationStatus.LOCKED, LocationStatus.MAINTAIN):
         label = "锁定" if loc.status == str(LocationStatus.LOCKED) else "维保"
         raise BizError(Codes.BIZ_RULE, f"库位 {loc.code} 处于「{label}」状态，不能上架")
-    if sku_id is not None:
+    if sku_id is not None and sku_type_of(order_type) == str(SkuType.MATERIAL):
         material = db.get(Material, sku_id)
         if material is not None:
             reason = location_mismatch_reason(loc.type, material.is_dangerous,
@@ -247,7 +253,7 @@ def scan(db: Session, order_id: int, req: ScanReq, operator_id: int) -> dict:
     # 库位校验（BR-013 + 库位状态）
     if req.location_id is None:
         raise BizError(Codes.BAD_REQUEST, "上架必须扫库位码")
-    _check_location(db, req.location_id, sku_id)
+    _check_location(db, req.location_id, sku_id, o.type)
 
     db.add(InboundItem(order_id=o.id, sku_id=sku_id, box_code=req.box_code, sn=req.sn,
                        qty=req.qty, location_id=req.location_id))

@@ -26,6 +26,8 @@ from app.domain.models import (
     InspectionItem,
     Location,
     Material,
+    OutboundItem,
+    OutboundOrder,
     Product,
     Supplier,
     SysConfig,
@@ -110,7 +112,7 @@ def _locations_for(warehouse_id: int, prefix: str, count: int, dangerous: bool =
 def seed(session: Session) -> dict:
     stats = {"warehouse": 0, "location": 0, "material": 0, "product": 0,
              "supplier": 0, "user": 0, "barcode": 0, "sys_config": 0, "api_client": 0,
-             "inspection": 0, "inbound_order": 0}
+             "inspection": 0, "inbound_order": 0, "outbound_order": 0}
 
     def has(model, **kw) -> bool:
         return session.execute(select(model).filter_by(**kw)).first() is not None
@@ -260,6 +262,41 @@ def seed(session: Session) -> dict:
         session.flush()
         session.add(InboundItem(order_id=order.id, sku_id=mat_id, qty=0))
         stats["inbound_order"] = stats.get("inbound_order", 0) + 1
+
+    # 产品入库单：MES 推送类型，本机 seed 造一条，让成品出库流可测
+    if not has(InboundOrder, no="PI20260127001"):
+        prod = session.execute(
+            select(Product.id).where(Product.code == "A3288")
+        ).scalar_one()
+        o = InboundOrder(no="PI20260127001", type="PRODUCT", source_no="RWD20260127001",
+                         status="PENDING", plan_qty=40, actual_qty=0, creator_id=1)
+        session.add(o)
+        session.flush()
+        session.add(InboundItem(order_id=o.id, sku_id=prod, qty=0))
+        stats["inbound_order"] = stats.get("inbound_order", 0) + 1
+
+    # 出库单：一张销售出库（成品 A3288）、一张领料出库（物料），都待出库
+    if not has(OutboundOrder, no="SO20260127001"):
+        prod = session.execute(
+            select(Product.id).where(Product.code == "A3288")
+        ).scalar_one()
+        o = OutboundOrder(no="SO20260127001", type="SALES", source_no="XSDD20260127001",
+                          status="PENDING", plan_qty=20, actual_qty=0, creator_id=1)
+        session.add(o)
+        session.flush()
+        session.add(OutboundItem(order_id=o.id, sku_id=prod, status="PENDING"))
+        stats["outbound_order"] = stats.get("outbound_order", 0) + 1
+
+    if not has(OutboundOrder, no="PL20260127001"):
+        mat = session.execute(
+            select(Material.id).where(Material.code == "DSP-AMOLED-67-FULL")
+        ).scalar_one()
+        o = OutboundOrder(no="PL20260127001", type="PICK", source_no="SCLL20260127001",
+                          status="PENDING", plan_qty=120, actual_qty=0, creator_id=1)
+        session.add(o)
+        session.flush()
+        session.add(OutboundItem(order_id=o.id, sku_id=mat, status="PENDING"))
+        stats["outbound_order"] = stats.get("outbound_order", 0) + 1
 
     session.commit()
     return stats

@@ -76,13 +76,14 @@ def _scan(client, kh, order_id, box=None, sn=None, loc=None, qty=1):
 # ---------------------------------------------------------------- 列表与详情
 def test_入库单列表与筛选(pr_order, client, ah):
     d = client.get("/api/v1/inbound-orders", headers=ah).json()["data"]
-    assert d["total"] == 1
-    assert d["items"][0]["no"] == "PR20260127001"
-    assert d["items"][0]["type_label"] == "采购入库"
-    assert d["items"][0]["status_label"] == "待入库"
+    assert d["total"] == 2, "种子有采购入库 + 产品入库各一张"
+    by_no = {i["no"]: i for i in d["items"]}
+    assert by_no["PR20260127001"]["type_label"] == "采购入库"
+    assert by_no["PI20260127001"]["type_label"] == "产品入库"
+    assert by_no["PR20260127001"]["status_label"] == "待入库"
 
     assert client.get("/api/v1/inbound-orders?type=PRODUCT",
-                      headers=ah).json()["data"]["total"] == 0
+                      headers=ah).json()["data"]["total"] == 1
     assert client.get("/api/v1/inbound-orders?status=DONE",
                       headers=ah).json()["data"]["total"] == 0
 
@@ -90,6 +91,7 @@ def test_入库单列表与筛选(pr_order, client, ah):
 def test_四类Tab角标(pr_order, client, ah):
     d = client.get("/api/v1/inbound-orders/status-counts", headers=ah).json()["data"]
     assert d["PURCHASE"]["PENDING"] == 1
+    assert d["PRODUCT"]["PENDING"] == 1
 
 
 def test_入库单详情带明细(pr_order, client, ah):
@@ -187,6 +189,26 @@ def test_危品物料可以上普通库位(pr_order, client, kh):
 
     r = _scan(client, kh, oid, box="BOX-DANGER-OK", loc=normal_loc, qty=5)
     assert r.json()["code"] == "0"
+
+
+def test_成品单不按物料属性规则校验(pr_order, client, ah, kh):
+    """成品单的 sku_id 是 product.id，不能拿它查 material 表——
+    两个表共用自增 id，会撞上同 id 的物料把成品单误拦。"""
+    from app.domain.models import Product
+
+    with SessionLocal() as s:
+        prod = s.execute(select(Product.id).where(Product.code == "A3288")).scalar_one()
+        danger_loc = s.execute(select(Location.id).where(
+            Location.type == str(LocationType.DANGEROUS)).limit(1)).scalar_one()
+        o = InboundOrder(no="PI20260127099", type="PRODUCT", source_no="RWD20260127099",
+                         status="PENDING", plan_qty=10, actual_qty=0, creator_id=1)
+        s.add(o)
+        s.flush()
+        s.add(InboundItem(order_id=o.id, sku_id=prod, qty=0))
+        s.commit()
+        oid = o.id
+    r = _scan(client, kh, oid, box="BOX-PROD-DANGER", loc=danger_loc, qty=5)
+    assert r.json()["code"] == "0", r.text
 
 
 def test_锁定库位不能上架(pr_order, client, kh):

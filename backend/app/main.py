@@ -8,7 +8,17 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app.api.v1 import admin, auth, base_data, inbound, inspection, integration, inventory
+from app.api.v1 import (
+    admin,
+    auth,
+    base_data,
+    inbound,
+    inspection,
+    integration,
+    inventory,
+    outbound,
+    sync,
+)
 from app.core.config import settings
 from app.core.db import SessionLocal, engine
 from app.core.errors import Codes, ok, register_error_handlers
@@ -67,6 +77,8 @@ def create_app() -> FastAPI:
     app.include_router(inspection.router, prefix=prefix)
     app.include_router(inbound.router, prefix=prefix)
     app.include_router(integration.router, prefix=prefix)
+    app.include_router(outbound.router, prefix=prefix)
+    app.include_router(sync.router, prefix=prefix)
 
     @app.get("/health", tags=["运维"], summary="健康检查（T-00-1 交付物）")
     def health(request: Request) -> dict:

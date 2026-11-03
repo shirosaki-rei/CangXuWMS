@@ -70,6 +70,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '来料检验', perm: 'inventory:view' },
       },
       {
+        path: 'outbound',
+        name: 'outbound',
+        component: () => import('@/views/outbound/OutboundList.vue'),
+        meta: { title: '出库管理', perm: 'inventory:view' },
+      },
+      {
+        path: 'outbound/:id',
+        name: 'outbound-detail',
+        component: () => import('@/views/outbound/OutboundDetail.vue'),
+        meta: { title: '出库详情', perm: 'inventory:view' },
+      },
+      {
         path: 'system/user',
         name: 'user',
         component: () => import('@/views/system/UserList.vue'),
