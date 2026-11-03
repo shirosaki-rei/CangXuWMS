@@ -17,6 +17,7 @@ from app.api.v1 import (
     integration,
     inventory,
     outbound,
+    stocktake,
     sync,
 )
 from app.core.config import settings
@@ -79,6 +80,7 @@ def create_app() -> FastAPI:
     app.include_router(integration.router, prefix=prefix)
     app.include_router(outbound.router, prefix=prefix)
     app.include_router(sync.router, prefix=prefix)
+    app.include_router(stocktake.router, prefix=prefix)
 
     @app.get("/health", tags=["运维"], summary="健康检查（T-00-1 交付物）")
     def health(request: Request) -> dict:

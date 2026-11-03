@@ -5,7 +5,9 @@ import { countOps } from '../db/queue'
 import { useSession } from '../stores/session'
 
 const ENTRIES = [
+  { key: 'jobs', title: '作业列表', desc: 'A06/A07 · 待入库与待出库', tab: '作业' },
   { key: 'scan', title: '扫码收货', desc: 'A02/A03 · 摄像头或激光头', tab: '扫码' },
+  { key: 'wh', title: '库内作业', desc: 'A09 · 盘点与移位', tab: '库内' },
   { key: 'queue', title: '待同步', desc: '离线队列与补传', tab: '待同步' },
   { key: 'diag', title: 'PDA 打样', desc: '环境自检与扫码验证', tab: '诊断' },
 ]
@@ -45,8 +47,8 @@ export default function WorkbenchScreen({ navigation }: any) {
       </View>
 
       <Text style={s.note}>
-        本版本只交付「骨架 + 扫码打样」：登录、扫码、离线队列、补传、环境自检。
-        入库/出库/盘点等作业页在 B04 按批次补齐。
+        本版本覆盖：登录、作业列表、扫码收货、库内作业（盘点/移位）、离线队列与补传、环境自检。
+        拣货路径与提交前校验随 B05 的 AI 能力一起补齐。
       </Text>
 
       <Pressable style={s.signOut} onPress={() => void signOut()}>

@@ -77,6 +77,9 @@ BaseDataViewer = Annotated[User, Depends(require("basedata:view"))]
 InventoryViewer = Annotated[User, Depends(require("inventory:view"))]
 InspectorUser = Annotated[User, Depends(require("inspection:judge"))]
 InboundVoidUser = Annotated[User, Depends(require("inbound:void"))]
+# 盘点创建/盈亏确认、供应商维护：主管及以上（PRD 3.2）
+StocktakeUser = Annotated[User, Depends(require("stocktake:manage"))]
+SupplierAdmin = Annotated[User, Depends(require("supplier:manage"))]
 
 
 def get_warehouse_scope(user: CurrentUser, db: DbDep) -> list[int] | None:

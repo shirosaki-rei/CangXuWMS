@@ -79,6 +79,7 @@ PYTHONPATH=. ./.venv/Scripts/python.exe tools/reset_db.py
 cd .. && node tools/e2e-smoke.mjs /tmp/e2e                             # B01：登录 → 基础资料 → 权限
 cd .. && node tools/e2e-b02.mjs /tmp/b02                               # B02：检验→扫码→提交→库存守恒
 cd .. && node tools/e2e-b03.mjs /tmp/b03                               # B03：FIFO→离线补传→提交→库存守恒
+cd .. && node tools/e2e-b04.mjs /tmp/b04                               # B04：盘点→盈亏单据→移位
 cd .. && node tools/e2e-print.mjs /tmp/print                           # 条码批量打印预览
 cd .. && node tools/check-code39.mjs                                   # Code 39 编码器自检（含反向解码）
 cd .. && node tools/check-mobile-queue.mjs                             # 移动端队列分批/归类/幂等键自检
@@ -110,7 +111,8 @@ backend/app/
 │   ├── permissions.py   # 权限矩阵（PRD 3.2），前后端共用
 │   ├── redis.py         # Redis 客户端 + 进程内兜底
 │   └── db.py            # 写连接 / 只读连接
-├── api/v1/              # auth / base_data / admin / inventory / inbound / inspection / integration / outbound / sync
+├── api/v1/              # auth / base_data / admin / inventory / inbound / inspection /
+│                        # integration / outbound / sync / stocktake
 ├── domain/
 │   ├── models.py        # 30 张表（架构 6.2）
 │   ├── enums.py
@@ -119,7 +121,8 @@ backend/app/
 │   └── rules.py         # BR-008/013/014/023/025 等纯规则
 ├── middleware/          # trace_id 贯穿、幂等、集成端原始 body 缓存
 ├── core/integration_auth.py  # HMAC-SHA256 签名（接口 4.1）
-├── service/             # auth / base_data / admin / inventory / inbound / inspection / outbound / sync
+├── service/             # auth / base_data / admin / inventory / inbound / inspection /
+│                        # outbound / sync / stocktake / move
 └── seed.py              # 种子数据（幂等，可重复执行）
 ```
 
@@ -133,7 +136,9 @@ backend/app/
 |---|---|
 | 登录 | 账号密码 + 图形验证码；服务器地址可改并持久化 |
 | 工作台 | 入口宫格 + 待同步角标 |
+| 作业 | A06/A07：待入库 / 待出库列表，点进扫码 |
 | 扫码 | **摄像头**与**键盘楔入**两种模式；扫到即入队并尽力同步 |
+| 库内 | A09：盘点实盘录入 + 移位三扫 |
 | 待同步 | 本地 SQLite 队列，手动同步 / 重试失败项 |
 | 诊断 | 打样自检：环境、SQLite、SecureStore、摄像头权限、接口可达 |
 

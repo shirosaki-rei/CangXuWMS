@@ -51,11 +51,19 @@ const groups = computed<MenuGroup[]>(() => {
       ].filter((i) => can(i.perm)),
     },
     {
+      name: '库内作业',
+      items: [
+        { path: '/stocktake', title: '物料盘点', perm: 'inventory:view' },
+        { path: '/move', title: '物料移位', perm: 'inventory:view' },
+      ].filter((i) => can(i.perm)),
+    },
+    {
       name: '基础设置',
       items: [
         { path: '/basedata/warehouse', title: '仓库管理', perm: 'basedata:view' },
         { path: '/basedata/location', title: '库位管理', perm: 'basedata:view' },
         { path: '/basedata/barcode', title: '条码管理', perm: 'basedata:view' },
+        { path: '/basedata/supplier', title: '供应商档案', perm: 'inventory:view' },
       ].filter((i) => can(i.perm)),
     },
     {

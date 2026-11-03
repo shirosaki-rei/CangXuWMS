@@ -9,6 +9,8 @@ import LoginScreen from './src/screens/LoginScreen'
 import WorkbenchScreen from './src/screens/WorkbenchScreen'
 import ScanScreen from './src/screens/ScanScreen'
 import QueueScreen from './src/screens/QueueScreen'
+import JobsScreen from './src/screens/JobsScreen'
+import WarehouseScreen from './src/screens/WarehouseScreen'
 import DiagnosticsScreen from './src/screens/DiagnosticsScreen'
 import { initQueue } from './src/db/queue'
 import {
@@ -23,7 +25,9 @@ function Tabs() {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false }}>
       <Tab.Screen name="工作台" component={WorkbenchScreen} />
+      <Tab.Screen name="作业" component={JobsScreen} />
       <Tab.Screen name="扫码" component={ScanScreen} />
+      <Tab.Screen name="库内" component={WarehouseScreen} />
       <Tab.Screen name="待同步" component={QueueScreen} />
       <Tab.Screen name="诊断" component={DiagnosticsScreen} />
     </Tab.Navigator>

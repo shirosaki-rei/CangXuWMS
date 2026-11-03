@@ -82,6 +82,30 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '出库详情', perm: 'inventory:view' },
       },
       {
+        path: 'stocktake',
+        name: 'stocktake',
+        component: () => import('@/views/stocktake/StocktakeList.vue'),
+        meta: { title: '物料盘点', perm: 'inventory:view' },
+      },
+      {
+        path: 'stocktake/:id',
+        name: 'stocktake-detail',
+        component: () => import('@/views/stocktake/StocktakeDetail.vue'),
+        meta: { title: '盘点详情', perm: 'inventory:view' },
+      },
+      {
+        path: 'move',
+        name: 'move',
+        component: () => import('@/views/stocktake/MoveList.vue'),
+        meta: { title: '物料移位', perm: 'inventory:view' },
+      },
+      {
+        path: 'basedata/supplier',
+        name: 'supplier',
+        component: () => import('@/views/basedata/SupplierList.vue'),
+        meta: { title: '供应商档案', perm: 'inventory:view' },
+      },
+      {
         path: 'system/user',
         name: 'user',
         component: () => import('@/views/system/UserList.vue'),

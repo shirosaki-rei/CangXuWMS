@@ -13,6 +13,8 @@ MATRIX: dict[str, frozenset[str]] = {
     "outbound:submit": frozenset({"KEEPER", "SUPERVISOR", "ADMIN"}),
     "outbound:void": frozenset({"SUPERVISOR", "ADMIN"}),
     "stocktake:manage": frozenset({"SUPERVISOR"}),
+    # 供应商档案（含超收阈值覆盖 BR-023）：主管与管理员
+    "supplier:manage": frozenset({"SUPERVISOR", "ADMIN"}),
     "move:create": frozenset({"KEEPER", "SUPERVISOR"}),
     "basedata:view": frozenset({"KEEPER", "INSPECTOR", "SUPERVISOR", "ADMIN"}),
     "basedata:manage": frozenset({"ADMIN"}),
