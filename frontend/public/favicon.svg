@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" shape-rendering="geometricPrecision">
+  <!-- 仓序 WMS · favicon（16px 简化版）：库位网格，右下格实心 -->
+  <!-- 大尺寸（登录页/顶栏）使用 3×2 版本，见 BrandMark.vue -->
+  <defs>
+    <clipPath id="bm-clip"><rect x="3" y="3" width="18" height="18" rx="3"/></clipPath>
+  </defs>
+  <rect x="12" y="12" width="9" height="9" fill="#1891FF" clip-path="url(#bm-clip)"/>
+  <rect x="3" y="3" width="18" height="18" rx="3" stroke="#1891FF" stroke-width="2.2"/>
+  <path d="M12 3v18M3 12h18" stroke="#1891FF" stroke-width="2.2"/>
+</svg>

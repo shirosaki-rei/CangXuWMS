@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import BrandMark from '@/components/BrandMark.vue'
 
 const router = useRouter()
 const user = useUserStore()
@@ -68,7 +69,7 @@ router.afterEach((to) => { active.value = to.path })
 <template>
   <div>
     <header class="topbar">
-      <div class="logo">WMS 仓储管理</div>
+      <div class="logo"><BrandMark :size="22" /><span>仓序 WMS</span></div>
       <div class="spacer" />
       <span class="who">
         {{ user.me?.name }}（{{ user.me?.role_label }}）

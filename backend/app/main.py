@@ -33,7 +33,7 @@ async def lifespan(_app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="WMS 仓储管理系统 API",
+        title="仓序 WMS · 仓储管理系统 API",
         version="1.0.0",
         description="接口契约以 `docs/WMS接口文档.md` 为单一数据源。",
         lifespan=lifespan,

@@ -1,4 +1,6 @@
-# WMS 仓储管理系统
+# 仓序 WMS 仓储管理系统
+
+> 产品名：**仓序 WMS**（品牌标识见 `frontend/public/favicon.svg`，意象为「库位网格」——其中一个实心格代表被 AI 推荐或已占用的库位）。
 
 FastAPI + MySQL 8 + Redis + Vue3 单机部署。文档与代码的对应关系见下表。
 

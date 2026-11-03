@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { authApi } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
+import BrandMark from '@/components/BrandMark.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -50,10 +51,10 @@ refreshCaptcha()
   <div class="login-wrap">
     <div class="login-box">
       <div class="login-hd">
-        <div class="login-logo">WMS</div>
+        <div class="login-logo"><BrandMark :size="30" /></div>
         <div>
-          <h1>仓储管理系统</h1>
-          <p>Warehouse Management System</p>
+          <h1>仓序 WMS</h1>
+          <p>仓储管理系统</p>
         </div>
       </div>
 
@@ -100,10 +101,8 @@ refreshCaptcha()
   width: 48px;
   height: 48px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #0d7ae0, #1891ff);
-  color: #fff;
-  font-weight: 700;
-  font-size: 17px;
+  background: #eaf3ff;
+  color: var(--blue);
   display: flex;
   align-items: center;
   justify-content: center;
