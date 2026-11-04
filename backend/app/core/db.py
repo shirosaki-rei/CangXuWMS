@@ -33,8 +33,21 @@ def _make(url: str, **kw):
 engine = _make(settings.db_url)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
-# ponytail: AI 只读连接池（架构 8.1 第一道锁）在 B05 / T-04-1 与三道锁一起建——
-# 现在建了没人用，只会白开一个连接池。届时加 readonly_engine + wms_ai_ro 账号。
+# AI 只读连接（架构 8.1 第一道锁）：连的是只授 SELECT 的 wms_ai_ro 账号。
+# 留空 DB_READONLY_URL 时退回写连接，仅本地开发可接受——生产必须配，否则三道锁只剩两道。
+readonly_engine = _make(settings.readonly_url, pool_size=5, max_overflow=5)
+ReadOnlySession = sessionmaker(
+    bind=readonly_engine, autoflush=False, autocommit=False, expire_on_commit=False
+)
+
+
+def get_readonly_session() -> Session:
+    """AI 模块专用依赖：只给只读 session。"""
+    s = ReadOnlySession()
+    try:
+        yield s
+    finally:
+        s.close()
 
 
 def get_session() -> Session:
@@ -52,3 +65,5 @@ def create_all() -> None:
 
 def drop_all() -> None:
     Base.metadata.drop_all(engine)
+    if readonly_engine is not engine:
+        readonly_engine.dispose()

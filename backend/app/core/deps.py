@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.db import get_session
+from app.core.db import get_readonly_session, get_session
 from app.core.errors import BizError, Codes
 from app.core.permissions import ALL_WAREHOUSE_ROLES, allows
 from app.core.security import decode_token, is_blacklisted
@@ -93,6 +93,9 @@ def get_warehouse_scope(user: CurrentUser, db: DbDep) -> list[int] | None:
     )
 
 WarehouseScope = Annotated[list[int] | None, Depends(get_warehouse_scope)]
+
+# AI 路由只拿得到只读 session（架构 8.1 第三道锁）
+ReadOnlyDep = Annotated[Session, Depends(get_readonly_session)]
 
 
 def enforce_warehouse(scope: list[int] | None, warehouse_id: int | None) -> None:

@@ -58,6 +58,12 @@ const groups = computed<MenuGroup[]>(() => {
       ].filter((i) => can(i.perm)),
     },
     {
+      name: 'AI 建议层',
+      items: [
+        { path: '/ai/dashboard', title: 'AI 效果看板', perm: 'ai:dashboard' },
+      ].filter((i) => can(i.perm)),
+    },
+    {
       name: '基础设置',
       items: [
         { path: '/basedata/warehouse', title: '仓库管理', perm: 'basedata:view' },

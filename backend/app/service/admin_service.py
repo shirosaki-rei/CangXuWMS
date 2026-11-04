@@ -170,12 +170,15 @@ def get_config(db: Session, key: str, default=None, *, scope_id: int | None = No
                 SysConfig.cfg_key == key,
                 SysConfig.scope == "SUPPLIER",
                 SysConfig.scope_id == scope_id,
-            )
-        ).scalar_one_or_none()
+            ).order_by(SysConfig.id.desc()).limit(1)
+        ).scalars().first()
         if row is not None:
             return row
-    return db.execute(
+    # 用 first() 而不是 scalar_one_or_none()：唯一索引在 scope_id 为 NULL 时
+    # 不生效（SQL 标准里 NULL 互不相等），历史上可能留下重复行，读配置不该因此 500
+    row = db.execute(
         select(SysConfig.cfg_value).where(
             SysConfig.cfg_key == key, SysConfig.scope == "GLOBAL"
-        )
-    ).scalar_one_or_none() or default
+        ).order_by(SysConfig.id.desc()).limit(1)
+    ).scalars().first()
+    return row or default

@@ -329,6 +329,9 @@ def submit(db: Session, order_id: int, req: SubmitReq, operator_id: int) -> dict
     if o.type == str(InboundType.PURCHASE):
         _assert_purchase_qualified(db, o)
 
+    # X04 提交前校验：有阻断项就不许提交（BR-017）
+    _assert_no_blocking(db, "INBOUND", order_id)
+
     # 按 (sku, location) 聚合后一次落库，锁序由 stock.apply_many 统一
     sku_type = sku_type_of(o.type)
     moves = [Move(sku_type, i.sku_id, i.location_id, i.qty) for i in items]
@@ -349,6 +352,22 @@ def submit(db: Session, order_id: int, req: SubmitReq, operator_id: int) -> dict
         "actual_qty": o.actual_qty,
         "finished_at": _s(o.finished_at),
     }
+
+
+def _assert_no_blocking(db: Session, order_type: str, order_id: int) -> None:
+    """跑一遍 AI 校验规则，存在 BLOCK 级就拒绝提交（BR-017 / 接口 3.6）。"""
+    from app.ai import check_engine
+    from app.ai.service import build_check_context
+
+    ctx = build_check_context(db, order_type, order_id)
+    results = check_engine.run(ctx)
+    blocks = [r for r in results if r.level == "BLOCK"]
+    if blocks:
+        raise BizError(
+            Codes.BIZ_RULE, "存在阻断项，不能提交",
+            data={"blocking_rules": [r.rule for r in blocks],
+                  "results": [r.to_dict() for r in blocks]},
+        )
 
 
 def _assert_purchase_qualified(db: Session, o: InboundOrder) -> None:

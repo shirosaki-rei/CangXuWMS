@@ -80,6 +80,7 @@ cd .. && node tools/e2e-smoke.mjs /tmp/e2e                             # B01：�
 cd .. && node tools/e2e-b02.mjs /tmp/b02                               # B02：检验→扫码→提交→库存守恒
 cd .. && node tools/e2e-b03.mjs /tmp/b03                               # B03：FIFO→离线补传→提交→库存守恒
 cd .. && node tools/e2e-b04.mjs /tmp/b04                               # B04：盘点→盈亏单据→移位
+cd .. && node tools/e2e-b05.mjs /tmp/b05                               # B05：推荐/路径/校验/看板
 cd .. && node tools/e2e-print.mjs /tmp/print                           # 条码批量打印预览
 cd .. && node tools/check-code39.mjs                                   # Code 39 编码器自检（含反向解码）
 cd .. && node tools/check-mobile-queue.mjs                             # 移动端队列分批/归类/幂等键自检
@@ -112,7 +113,12 @@ backend/app/
 │   ├── redis.py         # Redis 客户端 + 进程内兜底
 │   └── db.py            # 写连接 / 只读连接
 ├── api/v1/              # auth / base_data / admin / inventory / inbound / inspection /
-│                        # integration / outbound / sync / stocktake
+│                        # integration / outbound / sync / stocktake / ai
+├── ai/                  # 只读模块（边界由 tools/check_ai_boundary.py 卡住）
+│   ├── location_advisor.py  # X02 五维打分 + 分差置信度
+│   ├── path_solver.py       # X03 三档算法
+│   ├── check_engine.py      # X04 11 条规则
+│   └── llm_gateway.py       # T-04-5 超时/重试/降级/脱敏/限流
 ├── domain/
 │   ├── models.py        # 30 张表（架构 6.2）
 │   ├── enums.py
@@ -144,6 +150,16 @@ backend/app/
 
 离线优先：每次扫码先写本地队列（`client_op_id` 入队时定死），再尝试 POST `/sync/push`，
 断网也照常作业，恢复网络后按扫码顺序补传。
+
+## AI 层的三道锁
+
+| 层 | 手段 |
+|---|---|
+| 数据库 | `wms_ai_ro` 账号只授 `SELECT`（`tools/setup-mysql.sql` 已建） |
+| 代码 | `backend/tools/check_ai_boundary.py`：`app/ai/**` 禁止 import 写会话、禁止 `commit()` |
+| 运行时 | AI 路由的依赖注入只提供 `ReadOnlyDep` |
+
+LLM 默认**不接**（`LLM_BASE_URL` 为空）：库位推荐、路径、校验全走本地规则，问数降级。
 
 ## 关键约定
 

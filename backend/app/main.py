@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from app.api.v1 import (
     admin,
+    ai,
     auth,
     base_data,
     inbound,
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(outbound.router, prefix=prefix)
     app.include_router(sync.router, prefix=prefix)
     app.include_router(stocktake.router, prefix=prefix)
+    app.include_router(ai.router, prefix=prefix)
 
     @app.get("/health", tags=["运维"], summary="健康检查（T-00-1 交付物）")
     def health(request: Request) -> dict:

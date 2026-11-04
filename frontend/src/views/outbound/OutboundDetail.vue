@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import { ITEM_STATUS, outboundApi, type FifiLocation, type OutboundOrder } from '@/api/outbound'
 import { baseDataApi, LOCATION_STATUS, type Location } from '@/api/basedata'
 import { useUserStore } from '@/stores/user'
+import CheckDialog from '@/components/CheckDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +17,7 @@ const locations = ref<Location[]>([])
 const fifo = ref<FifiLocation[]>([])
 const fifoShortage = ref(0)
 const canVoid = ref(false)
+const checkRef = ref<InstanceType<typeof CheckDialog>>()
 
 const canExec = computed(() => !!user.me?.permissions.includes('outbound:exec'))
 const canSubmit = computed(() => !!user.me?.permissions.includes('outbound:submit'))
@@ -88,30 +90,13 @@ function useFifo(loc: FifiLocation) {
 }
 
 // ---------------------------------------------------------------- 提交
-const submitDlg = reactive({ visible: false, saving: false, reason: '' })
-const needReason = computed(
-  () => !!order.value && order.value.actual_qty !== order.value.plan_qty,
-)
-
 function openSubmit() {
-  submitDlg.reason = ''
-  submitDlg.visible = true
-}
-
-async function doSubmit() {
-  if (needReason.value && submitDlg.reason.trim().length < 5) {
-    ElMessage.warning('实发与计划不一致，差异原因至少 5 个字')
-    return
-  }
-  submitDlg.saving = true
-  try {
-    const r = await outboundApi.submit(orderId, submitDlg.reason.trim() || undefined)
+  // 先跑 X04；可用库存不足等阻断项会让提交按钮置灰（BR-017）
+  checkRef.value?.open('OUTBOUND', orderId, async (reason?: string) => {
+    const r = await outboundApi.submit(orderId, reason)
     ElMessage.success(r.status === 'DONE' ? '已出库' : `已发 ${r.actual_qty}，剩余 ${r.remain} 可拆单继续发`)
-    submitDlg.visible = false
     await load()
-  } finally {
-    submitDlg.saving = false
-  }
+  })
 }
 
 // ---------------------------------------------------------------- 作废
@@ -253,22 +238,7 @@ onMounted(async () => {
       </template>
     </el-dialog>
 
-    <!-- 提交出库 -->
-    <el-dialog v-model="submitDlg.visible" title="提交出库" width="470px">
-      <el-alert v-if="needReason" type="warning" :closable="false" class="mt8"
-                :title="`实发 ${order?.actual_qty} 与计划 ${order?.plan_qty} 不一致，必须填写差异原因（≥5 字）`"
-                show-icon />
-      <p v-else class="muted">实发与计划一致，可直接提交。</p>
-      <el-form label-width="90px" class="mt16">
-        <el-form-item label="差异原因">
-          <el-input v-model="submitDlg.reason" type="textarea" :rows="3" maxlength="255" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="submitDlg.visible = false">取消</el-button>
-        <el-button type="primary" :loading="submitDlg.saving" @click="doSubmit">确认提交</el-button>
-      </template>
-    </el-dialog>
+    <CheckDialog ref="checkRef" />
   </div>
 </template>
 

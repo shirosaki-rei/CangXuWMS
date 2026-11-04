@@ -348,6 +348,17 @@ def submit(db: Session, order_id: int, req: OutboundSubmitReq, operator_id: int)
         raise BizError(Codes.BIZ_RULE,
                        f"实发 {o.actual_qty} 超过计划 {o.plan_qty}，禁止超发")
 
+    # X04：可用库存不足等阻断项直接拦下（BR-017）
+    from app.ai import check_engine
+    from app.ai.service import build_check_context
+
+    ctx = build_check_context(db, "OUTBOUND", order_id)
+    blocks = [r for r in check_engine.run(ctx) if r.level == "BLOCK"]
+    if blocks:
+        raise BizError(Codes.BIZ_RULE, "存在阻断项，不能提交",
+                       data={"blocking_rules": [r.rule for r in blocks],
+                             "results": [r.to_dict() for r in blocks]})
+
     # 实发 < 计划必须填原因（BR-016）
     if o.actual_qty != o.plan_qty and not (req.reason or "").strip():
         raise BizError(Codes.BAD_REQUEST,

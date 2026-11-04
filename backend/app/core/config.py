@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     login_lock_minutes: int = 10
     idempotency_ttl: int = 86400
 
+    # ---- LLM（T-04-5）。留空 = 不接 LLM，所有能力走本地规则并标记 degraded ----
+    llm_base_url: str = ""
+    llm_api_key: str = ""
+    llm_model: str = "gpt-4o-mini"
+
     seed_admin_username: str = "admin"
     seed_admin_password: str = "admin123"
 

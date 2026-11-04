@@ -106,6 +106,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '供应商档案', perm: 'inventory:view' },
       },
       {
+        path: 'ai/dashboard',
+        name: 'ai-dashboard',
+        component: () => import('@/views/ai/AiDashboard.vue'),
+        meta: { title: 'AI 效果看板', perm: 'ai:dashboard' },
+      },
+      {
         path: 'system/user',
         name: 'user',
         component: () => import('@/views/system/UserList.vue'),

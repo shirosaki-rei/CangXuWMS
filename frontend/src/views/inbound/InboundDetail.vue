@@ -5,6 +5,8 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import { inboundApi, type InboundOrder } from '@/api/inbound'
 import { baseDataApi, LOCATION_STATUS, type Location } from '@/api/basedata'
 import { useUserStore } from '@/stores/user'
+import CheckDialog from '@/components/CheckDialog.vue'
+import { aiApi, type RecommendResult } from '@/api/ai'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,6 +16,10 @@ const loading = ref(false)
 const order = ref<InboundOrder | null>(null)
 const locations = ref<Location[]>([])
 const canVoid = ref(false)
+const checkRef = ref<InstanceType<typeof CheckDialog>>()
+
+/** X02 库位推荐 */
+const recDlg = reactive({ visible: false, loading: false, data: null as RecommendResult | null })
 
 const canExec = computed(() => !!user.me?.permissions.includes('inbound:exec'))
 const canSubmit = computed(() => !!user.me?.permissions.includes('inbound:submit'))
@@ -64,30 +70,51 @@ async function doScan() {
 }
 
 // ---------------------------------------------------------------- 提交
-const submitDlg = reactive({ visible: false, saving: false, reason: '' })
-const needReason = computed(
-  () => !!order.value && order.value.actual_qty !== order.value.plan_qty,
-)
-
 function openSubmit() {
-  submitDlg.reason = ''
-  submitDlg.visible = true
+  // 先跑 X04 校验；有阻断项时对话框里的提交按钮会置灰（BR-017）
+  checkRef.value?.open('INBOUND', orderId, async (reason?: string) => {
+    await inboundApi.submit(orderId, reason)
+    ElMessage.success('已提交入库')
+    load()
+  })
 }
 
-async function doSubmit() {
-  if (needReason.value && submitDlg.reason.trim().length < 5) {
-    ElMessage.warning('实收与计划不一致，差异原因至少 5 个字')
+/** X02：按本单 SKU 推荐库位 */
+async function openRecommend() {
+  const first = order.value?.items?.find((i) => i.sku_id)
+  if (!first) {
+    ElMessage.warning('单据没有明细，无法推荐库位')
     return
   }
-  submitDlg.saving = true
-  try {
-    await inboundApi.submit(orderId, submitDlg.reason.trim() || undefined)
-    ElMessage.success('已提交入库')
-    submitDlg.visible = false
-    load()
-  } finally {
-    submitDlg.saving = false
+  const whId = locations.value[0]?.warehouse_id
+  if (!whId) {
+    ElMessage.warning('没有可选库位')
+    return
   }
+  recDlg.visible = true
+  recDlg.loading = true
+  try {
+    recDlg.data = await aiApi.recommend({
+      sku_type: order.value?.type === 'PRODUCT' ? 'PRODUCT' : 'MATERIAL',
+      sku_id: first.sku_id,
+      warehouse_id: whId,
+      qty: Math.max(1, order.value?.plan_qty ?? 1),
+      pallet_count: 1,
+      order_id: orderId,
+    })
+  } finally {
+    recDlg.loading = false
+  }
+}
+
+function useRecommended(locationId: number) {
+  scanForm.location_id = locationId
+  recDlg.visible = false
+  if (recDlg.data) {
+    void aiApi.feedback(recDlg.data.suggestion_id, 'ACCEPT').catch(() => undefined)
+  }
+  ElMessage.success('已选为本次上架库位')
+  scanDlg.visible = true
 }
 
 // ---------------------------------------------------------------- 作废
@@ -120,6 +147,7 @@ onMounted(async () => {
           入库详情（P09） · <span class="mono">{{ order.no }}</span>
         </h2>
         <div class="acts">
+          <el-button v-if="canExec && !order.terminal" @click="openRecommend">AI 选位</el-button>
           <el-button v-if="canExec && !order.terminal" type="primary" @click="openScan">扫码收货</el-button>
           <el-button v-if="canSubmit && !order.terminal" type="primary" @click="openSubmit">
             提交入库
@@ -200,22 +228,42 @@ onMounted(async () => {
       </template>
     </el-dialog>
 
-    <!-- 提交入库 -->
-    <el-dialog v-model="submitDlg.visible" title="提交入库" width="460px">
-      <el-alert v-if="needReason" type="warning" :closable="false" class="mt8"
-                :title="`实收 ${order?.actual_qty} 与计划 ${order?.plan_qty} 不一致，必须填写差异原因（≥5 字）`"
-                show-icon />
-      <el-form label-width="80px" class="mt16">
-        <el-form-item label="差异原因">
-          <el-input v-model="submitDlg.reason" type="textarea" :rows="3" maxlength="255"
-                    placeholder="实收与计划一致时可不填" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="submitDlg.visible = false">取消</el-button>
-        <el-button type="primary" :loading="submitDlg.saving" @click="doSubmit">确认提交</el-button>
-      </template>
+    <!-- X02 库位推荐 -->
+    <el-dialog v-model="recDlg.visible" title="AI 库位推荐（X02）" width="520px">
+      <div v-loading="recDlg.loading">
+        <template v-if="recDlg.data">
+          <el-tag v-if="recDlg.data.degraded" type="warning" size="small" class="mb8">
+            库位坐标缺失，距离维度未参与评分
+          </el-tag>
+          <div v-if="recDlg.data.primary" class="rec-main">
+            <div class="rec-code">{{ recDlg.data.primary.location_code }}</div>
+            <el-tag size="small" :type="recDlg.data.confidence === 'HIGH' ? 'success' : 'warning'">
+              置信度 {{ recDlg.data.confidence }} · {{ recDlg.data.primary.score }} 分
+            </el-tag>
+            <ul class="rec-reasons">
+              <li v-for="r in recDlg.data.primary.reasons" :key="r">{{ r }}</li>
+            </ul>
+            <el-button type="primary" size="small" @click="useRecommended(recDlg.data!.primary!.location_id)">
+              用它
+            </el-button>
+          </div>
+          <el-alert v-else type="info" :closable="false" show-icon
+                    :title="recDlg.data.reason ?? '建议人工判断'" />
+          <div v-if="recDlg.data.alternatives.length" class="mt8">
+            <div class="muted">备选</div>
+            <div v-for="a in recDlg.data.alternatives" :key="a.location_id" class="alt">
+              <span class="mono">{{ a.location_code }}</span>
+              <span class="muted">{{ a.score }} 分 · {{ a.note }}</span>
+              <el-button link type="primary" size="small" @click="useRecommended(a.location_id)">
+                用它
+              </el-button>
+            </div>
+          </div>
+        </template>
+      </div>
     </el-dialog>
+
+    <CheckDialog ref="checkRef" />
   </div>
 </template>
 
@@ -224,4 +272,9 @@ onMounted(async () => {
 .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .acts { display: flex; gap: 8px; }
 .warn { color: #e65c2e; font-weight: 600; }
+.mb8 { margin-bottom: 8px; }
+.rec-main { border: 1px solid #d6e9ff; background: #f5faff; border-radius: 6px; padding: 12px; }
+.rec-code { font-size: 18px; font-weight: 600; color: #0d5bb5; margin-bottom: 6px; }
+.rec-reasons { margin: 8px 0; padding-left: 18px; color: #5b6b7a; font-size: 12px; line-height: 1.8; }
+.alt { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed #eef2f6; }
 </style>

@@ -9,6 +9,9 @@ from __future__ import annotations
 import os
 
 os.environ.setdefault("DB_URL", "sqlite:///./test_wms.db")
+# AI 走只读连接，测试里必须也指到同一个库——否则会连到 .env 里的 MySQL 只读账号，
+# 而那个库里没有测试表
+os.environ.setdefault("DB_READONLY_URL", os.environ["DB_URL"])
 os.environ.setdefault("WMS_REDIS_MEMORY", "1")
 
 import pytest  # noqa: E402
