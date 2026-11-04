@@ -1,7 +1,7 @@
 """入库单接口（接口 7/8/26/27/37，页面 P05–P09）。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
 from app.core.deps import CurrentUser, DbDep, InboundVoidUser
 from app.core.errors import ok, page
@@ -41,8 +41,16 @@ def scan(request: Request, db: DbDep, order_id: int, body: ScanReq,
 
 @router.post("/{order_id}/submit", summary="提交入库（接口 27 / P09 → X04）")
 def submit(request: Request, db: DbDep, order_id: int, body: SubmitReq,
-           user: CurrentUser) -> dict:
-    return ok(svc.submit(db, order_id, body, user.id), trace_id=request.state.trace_id)
+           user: CurrentUser, bg: BackgroundTasks) -> dict:
+    result = svc.submit(db, order_id, body, user.id)
+    # 63/64 回传：异步重试，失败不阻塞业务
+    from app.service.integration_service import inbound_payload, send_callback
+    from app.domain.models import InboundOrder
+
+    o = db.get(InboundOrder, order_id)
+    if o is not None:
+        bg.add_task(send_callback, db, "MES", inbound_payload(o))
+    return ok(result, trace_id=request.state.trace_id)
 
 
 @router.post("/{order_id}/void", summary="作废入库单（接口 37，主管及以上）")

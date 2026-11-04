@@ -1,7 +1,7 @@
 """出库单接口（接口 9/10/28/29/38，页面 P10–P13）。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
 from app.core.deps import CurrentUser, DbDep, InboundVoidUser, WarehouseScope
 from app.core.errors import BizError, Codes, ok, page
@@ -55,8 +55,15 @@ def pick(request: Request, db: DbDep, order_id: int, body: PickReq,
 
 @router.post("/{order_id}/submit", summary="提交出库（接口 29 / P13 → X04）")
 def submit(request: Request, db: DbDep, order_id: int, body: OutboundSubmitReq,
-           user: CurrentUser) -> dict:
-    return ok(svc.submit(db, order_id, body, user.id), trace_id=request.state.trace_id)
+           user: CurrentUser, bg: BackgroundTasks) -> dict:
+    result = svc.submit(db, order_id, body, user.id)
+    from app.service.integration_service import outbound_payload, send_callback
+    from app.domain.models import OutboundOrder
+
+    o = db.get(OutboundOrder, order_id)
+    if o is not None:
+        bg.add_task(send_callback, db, "MES", outbound_payload(o))
+    return ok(result, trace_id=request.state.trace_id)
 
 
 @router.post("/{order_id}/void", summary="作出库单（接口 38，主管及以上）")

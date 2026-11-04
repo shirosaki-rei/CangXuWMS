@@ -119,6 +119,9 @@ backend/app/
 │   ├── path_solver.py       # X03 三档算法
 │   ├── check_engine.py      # X04 11 条规则
 │   └── llm_gateway.py       # T-04-5 超时/重试/降级/脱敏/限流
+├── tasks/
+│   ├── scheduler.py         # APScheduler：对账/清理/采纳率复核/周报
+│   └── reconcile.py         # 每日对账
 ├── domain/
 │   ├── models.py        # 30 张表（架构 6.2）
 │   ├── enums.py
@@ -160,6 +163,19 @@ backend/app/
 | 运行时 | AI 路由的依赖注入只提供 `ReadOnlyDep` |
 
 LLM 默认**不接**（`LLM_BASE_URL` 为空）：库位推荐、路径、校验全走本地规则，问数降级。
+
+## 运维
+
+```bash
+# 每日备份（保留 7 天）与恢复
+./tools/backup.sh
+./tools/backup.sh restore volumes/backup/wms-20261104-0300.sql.gz
+
+# 上线 Gate（G1 坐标 100% / G2 属性完整率 / G3 近 30 天流水）
+PYTHONPATH=. ./.venv/Scripts/python.exe tools/gate_check.py
+```
+
+定时任务由 compose 的 `worker` 容器执行（`python -m app.tasks.scheduler`），单实例运行。
 
 ## 关键约定
 

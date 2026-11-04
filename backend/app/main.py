@@ -105,13 +105,23 @@ def create_app() -> FastAPI:
             trace_id=request.state.trace_id,
         )
 
-    @app.get("/metrics", tags=["运维"], summary="Prometheus 指标（架构 9.5，最小集）")
+    @app.get("/metrics", tags=["运维"], summary="Prometheus 指标（架构 9.5）")
     def metrics() -> str:
-        # ponytail: 先暴露进程级指标；QPS/P95/慢 SQL 等业务指标留到 B06 可观测性任务
+        from app.middleware.trace import STATS
+
         body = [
             "# HELP wms_uptime_seconds 进程运行秒数",
             "# TYPE wms_uptime_seconds gauge",
             f"wms_uptime_seconds {time.time() - STARTED_AT:.0f}",
+            "# HELP wms_requests_total 请求总数",
+            "# TYPE wms_requests_total counter",
+            f"wms_requests_total {STATS['requests']}",
+            "# HELP wms_errors_total 5xx 请求数",
+            "# TYPE wms_errors_total counter",
+            f"wms_errors_total {STATS['errors']}",
+            "# HELP wms_slow_requests_total 超过 1.5s 的请求数",
+            "# TYPE wms_slow_requests_total counter",
+            f"wms_slow_requests_total {STATS['slow']}",
             "# HELP wms_db_up 数据库连通性",
             "# TYPE wms_db_up gauge",
         ]

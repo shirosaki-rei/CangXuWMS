@@ -152,13 +152,17 @@ def seed(session: Session) -> dict:
         if has(Material, code=code):
             continue
         session.add(Material(code=code, name=name, type=mtype, unit=unit, safety_stock=safety,
-                             weight_kg=weight, is_dangerous=danger, temp_control=str(temp)))
+                             weight_kg=weight,
+                             # 体积按重量估（Gate G2 要求属性完整率 100%）
+                             volume_m3=(float(weight) * 2 if weight is not None else None),
+                             is_dangerous=danger, temp_control=str(temp)))
         stats["material"] += 1
 
     for code, name, spec, unit, weight, danger, temp in PRODUCTS:
         if has(Product, code=code):
             continue
         session.add(Product(code=code, name=name, spec=spec, unit=unit, weight_kg=weight,
+                            volume_m3=(float(weight) * 1.5 if weight is not None else None),
                             is_dangerous=danger, temp_control=str(temp)))
         stats["product"] += 1
 

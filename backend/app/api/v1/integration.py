@@ -11,7 +11,13 @@ from app.core.deps import DbDep
 from app.core.errors import BizError, Codes, ok
 from app.core.integration_auth import IntegrationClient
 from app.domain.models import Inspection, InspectionItem, Material, Supplier
-from app.schemas.integration import InspectionPushReq
+from app.schemas.integration import (
+    InspectionPushReq,
+    OutboundPushReq,
+    PickPushReq,
+    ProductionInboundReq,
+)
+from app.service import integration_service
 
 router = APIRouter(prefix="/integration", tags=["集成接口（MES/ERP）"])
 
@@ -67,3 +73,30 @@ def _resolve_material(db, code: str) -> int:
     if mid is None:
         raise BizError(Codes.BAD_REQUEST, f"物料编码 {code} 未维护")
     return mid
+
+
+@router.post("/outbound-orders", summary="MES 推送销售发货指令（接口 59）")
+def push_outbound(request: Request, db: DbDep, body: OutboundPushReq,
+                  client: IntegrationClient) -> dict:
+    r = integration_service.push_outbound(db, body)
+    if r.get("code") == Codes.REPLAY:
+        return {**r, "trace_id": request.state.trace_id}
+    return ok(r, trace_id=request.state.trace_id)
+
+
+@router.post("/pick-requests", summary="MES 推送领料需求（接口 60）")
+def push_pick(request: Request, db: DbDep, body: PickPushReq,
+              client: IntegrationClient) -> dict:
+    r = integration_service.push_pick(db, body)
+    if r.get("code") == Codes.REPLAY:
+        return {**r, "trace_id": request.state.trace_id}
+    return ok(r, trace_id=request.state.trace_id)
+
+
+@router.post("/production-inbound", summary="MES 推送完工入库（接口 61）")
+def push_production_inbound(request: Request, db: DbDep, body: ProductionInboundReq,
+                            client: IntegrationClient) -> dict:
+    r = integration_service.push_production_inbound(db, body)
+    if r.get("code") == Codes.REPLAY:
+        return {**r, "trace_id": request.state.trace_id}
+    return ok(r, trace_id=request.state.trace_id)

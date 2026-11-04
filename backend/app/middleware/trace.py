@@ -12,6 +12,9 @@ from app.core.logging import get_logger
 
 log = get_logger("wms.http")
 
+# 进程级计数器：/metrics 直接读，不引 prometheus_client（单机够用）
+STATS = {"requests": 0, "errors": 0, "slow": 0}
+
 
 class TraceMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
@@ -20,6 +23,12 @@ class TraceMiddleware(BaseHTTPMiddleware):
         started = time.perf_counter()
         response = await call_next(request)
         elapsed = round((time.perf_counter() - started) * 1000, 1)
+
+        STATS["requests"] += 1
+        if response.status_code >= 500:
+            STATS["errors"] += 1
+        if elapsed > 1500:
+            STATS["slow"] += 1
         response.headers["x-trace-id"] = trace_id
         if not request.url.path.startswith(("/health", "/metrics")):
             log.info(

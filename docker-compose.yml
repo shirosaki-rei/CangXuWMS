@@ -90,8 +90,8 @@ services:
     environment:
       DB_URL: mysql+pymysql://${MYSQL_USER:-wms}:${MYSQL_PASSWORD:-wmsdev}@mysql:3306/wms?charset=utf8mb4
       REDIS_URL: redis://redis:6379/0
-    # B06 接入 APScheduler 前先占位，避免多个 worker 重复跑任务
-    command: ["python", "-c", "import time; print('worker idle (B06)'); time.sleep(3600)"]
+    # 定时任务进程：对账 / 清理 / 采纳率复核 / 周报。单实例，避免任务重复。
+    command: ["python", "-m", "app.tasks.scheduler"]
     depends_on:
       migrate:
         condition: service_completed_successfully
