@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.db import SessionLocal, create_all, engine
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.domain.models import (
     ApiClient,
     Barcode,
@@ -173,7 +173,9 @@ def seed(session: Session) -> dict:
         session.add(Supplier(code=code, name=name, over_receive=over, contact=contact))
         stats["supplier"] += 1
 
-    # 账号：五种角色各一个，密码同用户名
+    # 账号：五种角色各一个。演示账号密码同用户名；admin 的密码取 SEED_ADMIN_PASSWORD。
+    # 本项目没有改密接口，密码只能由种子决定，所以每次 seed 都按 .env 校正 admin 密码
+    # （.env 是唯一真相源），顺带清掉密码不一致期间累积的失败计数与锁定。
     accounts = [
         ("admin", "张伟", Role.ADMIN, None, "13800000001"),
         ("supervisor", "陈芳", Role.SUPERVISOR, None, "13800000002"),
@@ -182,16 +184,27 @@ def seed(session: Session) -> dict:
         ("mes-prod", "MES 接口账号", Role.INTEGRATION, None, None),
     ]
     for username, name, role, whs, phone in accounts:
-        if has(User, username=username):
+        is_admin = username == settings.seed_admin_username
+        pwd = settings.seed_admin_password if is_admin else username
+        u = session.execute(select(User).filter_by(username=username)).scalars().first()
+        if u is None:
+            u = User(username=username, name=name, role=str(role), phone=phone,
+                     password=hash_password(pwd))
+            session.add(u)
+            session.flush()
+            stats["user"] += 1
+            if whs:
+                for c in whs:
+                    session.add(UserWarehouse(user_id=u.id, warehouse_id=wh_ids[c]))
             continue
-        u = User(username=username, name=name, role=str(role), phone=phone,
-                 password=hash_password(username))
-        session.add(u)
-        session.flush()
-        stats["user"] += 1
-        if whs:
-            for c in whs:
-                session.add(UserWarehouse(user_id=u.id, warehouse_id=wh_ids[c]))
+        if is_admin:
+            changed = not verify_password(pwd, u.password)
+            if changed:
+                u.password = hash_password(pwd)
+            if changed or u.fail_count or u.locked_until:
+                u.fail_count = 0
+                u.locked_until = None
+                stats["admin_password_reset"] = stats.get("admin_password_reset", 0) + 1
 
     # 条码：每类各一条
     for code, btype, ref in [("KQ-001", BarcodeType.ZONE, None),
