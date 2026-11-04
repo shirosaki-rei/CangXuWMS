@@ -84,6 +84,7 @@ cd .. && node tools/e2e-b05.mjs /tmp/b05                               # B05：�
 cd .. && node tools/e2e-print.mjs /tmp/print                           # 条码批量打印预览
 cd .. && node tools/check-code39.mjs                                   # Code 39 编码器自检（含反向解码）
 cd .. && node tools/check-mobile-queue.mjs                             # 移动端队列分批/归类/幂等键自检
+cd .. && node tools/check-uuid.mjs                                    # 幂等键 UUID（含非安全上下文降级）
 ```
 
 - 单测默认用 SQLite 文件库，零外部依赖；
@@ -191,6 +192,13 @@ PYTHONPATH=. ./.venv/Scripts/python.exe tools/gate_check.py
 
 超限返回 HTTP 429 + `WMS-4290`，`data` 里带 `bucket` 与 `limit`。
 限额可在 `backend/.env` 用 `RL_WRITE` / `RL_SYNC_PUSH` / `RL_AI_QUERY` / `RL_INTEGRATION` 调整。
+
+## 用局域网地址打开时要注意
+
+`crypto.randomUUID` 只在**安全上下文**（https 或 localhost）存在。仓库现场常用
+`http://192.168.x.x:8080` 打开页面，这时它不存在——如果直接调用，异常发生在
+`fetch` 之前，表现为「点登录没反应、只看到验证码刷新」，且**没有任何网络请求**，
+非常难查。`frontend/src/utils/uuid.ts` 已内置降级实现，`tools/check-uuid.mjs` 可自检。
 
 ## 关键约定
 

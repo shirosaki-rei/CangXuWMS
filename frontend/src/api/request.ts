@@ -1,6 +1,7 @@
 import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { uuidv4 } from '@/utils/uuid'
 import { hintOf, isBizError, SILENT_CODES } from '@/utils/errorcode'
 
 const BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
@@ -11,9 +12,9 @@ const http = axios.create({
   headers: { 'Content-Type': 'application/json; charset=utf-8' },
 })
 
-/** 每次「用户意图」一个 UUID，落 localStorage 保证刷新/重开不丢（接口文档 1.3） */
+/** 每次「用户意图」一个 UUID（接口文档 1.3）。实现见 utils/uuid.ts（含非安全上下文的降级）。 */
 export function newOpId(): string {
-  return crypto.randomUUID()
+  return uuidv4()
 }
 
 http.interceptors.request.use((cfg: InternalAxiosRequestConfig) => {
