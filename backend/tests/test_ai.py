@@ -384,3 +384,55 @@ def test_出库可用库存不足时提交被阻断(seeded, client, kh, wh1_id, 
     # 直接调校验接口也应给出 submittable=false
     chk = _post(client, f"/api/v1/ai/checks/OUTBOUND/{oid}", kh, {}).json()["data"]
     assert chk["submittable"] is False
+
+
+# ---------------------------------------------------------------- 验收标准专项
+def test_AC_AI_04_二十个拣货点节省不少于15pct():
+    pts = [Point("S", 0, 0)] + [Point(f"{chr(65 + i % 4)}-{i:03d}", i % 10 * 2, i // 10 * 3)
+                                for i in range(19)]
+    r = path_solver.optimize(pts)
+    assert r["point_count"] == 20
+    assert r["saved_pct"] >= 15, f"只节省 {r['saved_pct']}%"
+
+
+def test_AC_AI_07_全部规则三秒内跑完():
+    import time
+
+    ctx = CheckContext(order_type="INBOUND", plan_qty=100, actual_qty=112,
+                       items=[{"box_code": f"B{i}"} for i in range(200)],
+                       mismatch_locations=[])
+    t0 = time.perf_counter()
+    check_engine.run(ctx)
+    elapsed = time.perf_counter() - t0
+    assert elapsed < 3.0, f"耗时 {elapsed:.2f}s"
+
+
+def test_AC_AI_01_冷启动仍有候选与理由(seeded, client, kh, wh1_id):
+    """零历史数据（seed 没有任何库存/流水）下也要给出候选与理由。"""
+    from sqlalchemy import select
+
+    from app.core.db import SessionLocal
+    from app.domain.models import Product
+
+    with SessionLocal() as s:
+        pid = s.execute(select(Product.id).where(Product.code == "A3288")).scalar_one()
+    d = _post(client, "/api/v1/ai/locations/recommend", kh,
+              {"sku_type": "PRODUCT", "sku_id": pid, "warehouse_id": wh1_id,
+               "qty": 1, "pallet_count": 1}).json()["data"]
+    # 冷启动下周转权重为 0，但仍应有候选（低置信度时给 3 个并列）
+    assert d["alternatives"], "冷启动也必须给候选"
+    assert len(d["alternatives"]) == 3
+    assert all(a["note"] for a in d["alternatives"]), "每个候选都要有理由"
+
+
+def test_AC_AI_02_危品物料不推荐普通库位(seeded, client, kh, wh1_id):
+    """硬约束：非危品物料不会进危品库位；反过来危品库位只在物料为危品时出现。"""
+    from app.ai import location_advisor as la
+
+    ctx = la.Context(pallet_count=1, warehouse_id=1, is_dangerous=False)
+    cands = [la.Candidate(1, "DNG-1", "DANGEROUS", "IDLE", 10, 0, 5.0),
+             la.Candidate(2, "NRM-1", "NORMAL", "IDLE", 10, 0, 5.0)]
+    out = la.recommend(cands, ctx)
+    picked = {out["primary"]["location_id"]} if out["primary"] else set()
+    picked |= {a["location_id"] for a in out["alternatives"]}
+    assert 1 not in picked, "危品库位不该出现在普通物料的推荐里"

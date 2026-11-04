@@ -200,6 +200,17 @@ def test_同一SN不能挂两张未关闭出库单_BR010(so_order, stocked, clie
     assert "BR-010" in r.json()["message"]
 
 
+def test_盘点中库位不能出库_BR007(so_order, stocked, client, kh):
+    """盘点会锁定库位，此时发起出库必须被拒绝（AC-07）。"""
+    with SessionLocal() as s:
+        s.get(Location, stocked["early_loc"]).status = "LOCKED"
+        s.commit()
+    r = _post(client, f"/api/v1/outbound-orders/{so_order['order_id']}/pick", kh,
+              {"location_id": stocked["early_loc"], "qty": 1})
+    assert r.json()["code"] == "WMS-4221"
+    assert "盘点中" in r.json()["message"]
+
+
 def test_终态单不能再拣货(so_order, stocked, client, ah, kh):
     with SessionLocal() as s:
         o = s.get(OutboundOrder, so_order["order_id"])

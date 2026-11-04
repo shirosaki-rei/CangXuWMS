@@ -279,6 +279,10 @@ def pick(db: Session, order_id: int, req: PickReq, operator_id: int) -> dict:
     loc = db.get(Location, req.location_id)
     if loc is None:
         raise BizError(Codes.BAD_REQUEST, "库位不存在")
+    # BR-007：盘点期间库位锁定，出入库一律拒绝
+    if loc.status in (LocationStatus.LOCKED, LocationStatus.MAINTAIN):
+        label = "盘点中" if loc.status == str(LocationStatus.LOCKED) else "维保中"
+        raise BizError(Codes.BIZ_RULE, f"库位 {loc.code} {label}，不能出库")
 
     # outbound_item 没有 qty 列（架构 6.2）：一行一件，逐件 SN 作为发货凭证。
     # 带 SN 时只能一件一扫；不带 SN 才允许批量拣。
