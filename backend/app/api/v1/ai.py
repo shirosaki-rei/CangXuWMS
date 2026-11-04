@@ -43,6 +43,11 @@ class QueryReq(BaseModel):
     question: str = Field(..., min_length=2, max_length=255)
 
 
+class SilenceReq(BaseModel):
+    kind: str = Field(..., pattern=r"^(LOCATION|PATH|CHECK)$")
+    days: int = Field(7, ge=1, le=90)
+
+
 class FeedbackReq(BaseModel):
     suggestion_id: int
     action: str = Field(..., pattern=r"^(ACCEPT|REJECT|REVOKE)$")
@@ -132,3 +137,14 @@ def query(request: Request, db: DbDep, ro: ReadOnlyDep, scope: WarehouseScope,
     # 数据权限：仓管员/检验员只查可见仓库，主管/管理员不限（AC-AI-12）
     return ok(nq.ask(ro, db, question=body.question, user_id=user.id, warehouse_ids=scope),
               trace_id=request.state.trace_id)
+
+
+@router.get("/settings", summary="AI 开关与静默状态（前端据此隐藏入口）")
+def settings(request: Request, db: DbDep, user: CurrentUser) -> dict:
+    return ok(ai.settings_snapshot(db, user.id), trace_id=request.state.trace_id)
+
+
+@router.post("/silence", summary="建议静默（BR-021：7 天内不再展示该类建议）")
+def silence(request: Request, db: DbDep, body: SilenceReq, user: CurrentUser) -> dict:
+    ai.silence(user.id, body.kind, body.days)
+    return ok({"kind": body.kind, "days": body.days}, trace_id=request.state.trace_id)

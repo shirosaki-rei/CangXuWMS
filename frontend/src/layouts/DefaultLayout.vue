@@ -3,11 +3,15 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { settingsApi, type AiSettings } from '@/api/ai'
+import { onMounted } from 'vue'
 import BrandMark from '@/components/BrandMark.vue'
 
 const router = useRouter()
 const user = useUserStore()
 const active = ref('dashboard')
+// AI 开关：关闭后入口直接不出现（BR-020 / AC-AI-10）
+const ai = ref<AiSettings | null>(null)
 
 interface MenuItem {
   path: string
@@ -60,9 +64,11 @@ const groups = computed<MenuGroup[]>(() => {
     {
       name: 'AI 建议层',
       items: [
-        { path: '/ai/query', title: '智能问数', perm: 'ai:query' },
-        { path: '/ai/dashboard', title: 'AI 效果看板', perm: 'ai:dashboard' },
-      ].filter((i) => can(i.perm)),
+        { path: '/ai/query', title: '智能问数', perm: 'ai:query',
+          enabled: ai.value?.query_enabled !== false },
+        { path: '/ai/dashboard', title: 'AI 效果看板', perm: 'ai:dashboard',
+          enabled: ai.value?.ai_enabled !== false },
+      ].filter((i) => can(i.perm) && i.enabled),
     },
     {
       name: '基础设置',
@@ -103,6 +109,14 @@ async function onLogout() {
   await user.logout()
   router.replace('/login')
 }
+
+onMounted(async () => {
+  try {
+    ai.value = await settingsApi.get()
+  } catch {
+    // 取不到设置时按「全开」处理，不影响主流程
+  }
+})
 
 // 顶栏当前路由高亮
 router.afterEach((to) => { active.value = to.path })

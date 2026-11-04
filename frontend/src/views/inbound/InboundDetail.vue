@@ -6,7 +6,7 @@ import { inboundApi, type InboundOrder } from '@/api/inbound'
 import { baseDataApi, LOCATION_STATUS, type Location } from '@/api/basedata'
 import { useUserStore } from '@/stores/user'
 import CheckDialog from '@/components/CheckDialog.vue'
-import { aiApi, type RecommendResult } from '@/api/ai'
+import { aiApi, settingsApi, type RecommendResult } from '@/api/ai'
 
 const route = useRoute()
 const router = useRouter()
@@ -107,6 +107,12 @@ async function openRecommend() {
   }
 }
 
+async function silenceRecommend() {
+  await settingsApi.silence('LOCATION', 7)
+  recDlg.visible = false
+  ElMessage.success('已静默 7 天，期间不再展示库位推荐')
+}
+
 function useRecommended(locationId: number) {
   scanForm.location_id = locationId
   recDlg.visible = false
@@ -149,7 +155,18 @@ onMounted(async () => {
         <div class="acts">
           <el-button v-if="canExec && !order.terminal" @click="openRecommend">AI 选位</el-button>
           <el-button v-if="canExec && !order.terminal" type="primary" @click="openScan">扫码收货</el-button>
-          <el-button v-if="canSubmit && !order.terminal" type="primary" @click="openSubmit">
+          <el-tooltip
+            v-if="canSubmit && !order.terminal && order.submittable === false"
+            :content="order.purchase_block_reason ?? '不满足入库条件'"
+            placement="bottom"
+          >
+            <span><el-button type="primary" disabled>提交入库</el-button></span>
+          </el-tooltip>
+          <el-button
+            v-else-if="canSubmit && !order.terminal"
+            type="primary"
+            @click="openSubmit"
+          >
             提交入库
           </el-button>
           <el-button v-if="canVoid && !order.terminal" type="danger" @click="onVoid">作废</el-button>
@@ -173,6 +190,14 @@ onMounted(async () => {
           <el-descriptions-item label="完成时间">{{ order.finished_at ?? '—' }}</el-descriptions-item>
           <el-descriptions-item label="版本">{{ order.version }}</el-descriptions-item>
         </el-descriptions>
+        <el-alert
+          v-if="order.submittable === false"
+          type="error"
+          :closable="false"
+          show-icon
+          class="mt8"
+          :title="order.purchase_block_reason ?? '不满足入库条件，提交按钮已置灰'"
+        />
         <el-alert v-if="order.qty_mismatch" type="warning" :closable="false" class="mt8"
                   title="明细行累计数量与计划数不一致" show-icon />
       </div>
@@ -243,9 +268,12 @@ onMounted(async () => {
             <ul class="rec-reasons">
               <li v-for="r in recDlg.data.primary.reasons" :key="r">{{ r }}</li>
             </ul>
-            <el-button type="primary" size="small" @click="useRecommended(recDlg.data!.primary!.location_id)">
-              用它
-            </el-button>
+            <div class="rec-acts">
+              <el-button type="primary" size="small" @click="useRecommended(recDlg.data!.primary!.location_id)">
+                用它
+              </el-button>
+              <el-button link size="small" @click="silenceRecommend">不再提示 7 天</el-button>
+            </div>
           </div>
           <el-alert v-else type="info" :closable="false" show-icon
                     :title="recDlg.data.reason ?? '建议人工判断'" />
@@ -275,6 +303,7 @@ onMounted(async () => {
 .mb8 { margin-bottom: 8px; }
 .rec-main { border: 1px solid #d6e9ff; background: #f5faff; border-radius: 6px; padding: 12px; }
 .rec-code { font-size: 18px; font-weight: 600; color: #0d5bb5; margin-bottom: 6px; }
+.rec-acts { display: flex; gap: 8px; align-items: center; }
 .rec-reasons { margin: 8px 0; padding-left: 18px; color: #5b6b7a; font-size: 12px; line-height: 1.8; }
 .alt { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed #eef2f6; }
 </style>

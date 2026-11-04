@@ -24,7 +24,7 @@
 |---|---|---|---|
 | AC-01 | 登录锁定 | `test_auth_api.py::test_密码错误累加五次锁十分钟`（第 6 次返回 `WMS-4221` + `locked_until`） | ✅ |
 | AC-02 | 采购入库主流程 | 检验→入库→上架→回传全链：`test_inspection_api.py`、`test_inbound_api.py`、`tools/e2e-b02.mjs`（17/17）。**MES 回传**需真实端点，见 `test_b06_integration.py` 之外的联调；**ERP 应付单**不属 WMS 职责 | 🟡 |
-| AC-03 | 检验未通过拦截 | 后端 `BR-004`：`test_inbound_api.py::test_采购入库必须关联已检合格检验单_BR004`。**前端入库按钮未置灰**（只在提交时拦截） | 🟡 |
+| AC-03 | 检验未通过拦截 | 后端 `BR-004`：`test_采购入库必须关联已检合格检验单_BR004`；详情接口返回 `submittable` + `purchase_block_reason`，前端据此置灰并按钮提示（`test_采购单未检验时不可提交_AC_03`） | ✅ |
 | AC-04 | 超收审批 | 阈值判定：`test_inspection_api.py::test_超收超阈值转人工_BR005`；R4 预警：`test_ai.py::test_R4超收超阈值预警`。**“主管审批”没有独立审批流**，当前是拒绝并提示转人工 | 🟡 |
 | AC-05 | 部分发货 | `test_outbound_api.py::test_实收与计划不一致必须填原因_BR016`（状态 `PARTIAL`，`remain` 可继续发） | ✅ |
 | AC-06 | 重复扫码拦截 | `test_inbound_api.py::test_箱码重复被拒_WMS4093`（返回 `WMS-4093` + `duplicate: true`，不落库） | ✅ |
@@ -48,7 +48,7 @@
 | AC-AI-07 | 校验性能 | `test_ai.py::test_AC_AI_07_全部规则三秒内跑完`（200 条明细，实测毫秒级） | ✅ |
 | AC-AI-08 | 问数只读 | `test_nl_query.py::test_guard拒绝危险SQL`（8 种写/多语句/注释/超限写法全被拒）、`test_guard放行合法查询`；拒绝原因写入 `nl_query_log.rejected` | ✅ |
 | AC-AI-09 | 问数口径 | `test_同一问题两次结果一致_AC_AI_09`（同一问题 SQL 与结果完全相同——SQL 来自模板，不是模型生成） | ✅ |
-| AC-AI-10 | LLM 降级 | 问数在无 LLM 时照常返回数据表（意图解析是规则版，不依赖模型）：`test_nl_query.py` 全部在无 LLM 下通过；`llm_gateway` 超时/断网返回模板文案并标 `degraded`。**菜单里的入口仍显示**，只是调用会明确报「已关闭」 | 🟡 |
+| AC-AI-10 | LLM 降级 | 问数在无 LLM 时照常返回数据表（`test_nl_query.py` 全部无 LLM 通过）；`llm_gateway` 超时返回模板文案并标 `degraded`；**入口按开关隐藏**：`/ai/settings` 返回 `ai_enabled`/`query_enabled`，菜单据此过滤（`test_静默接口与设置快照`） | ✅ |
 | AC-AI-11 | 采纳反馈 | `test_ai.py::test_反馈与采纳率`（ACCEPT/REJECT 落库，`/ai/metrics` 按场景出采纳率） | ✅ |
 | AC-AI-12 | 权限隔离 | 问数：`test_仓管员查不到未授权仓库_AC_AI_12`（WH-003 的数据仓管员查不到，SQL 里强制注入 `warehouse_id IN (...)`）；其余接口见 `test_仓管员显式传未分配仓库被拒_WMS4030` | ✅ |
 
@@ -56,7 +56,7 @@
 
 | 编号 | 用例 | 证据 | 状态 |
 |---|---|---|---|
-| AC-CHK-01 | 入口一致性 | 入库详情、出库详情均已接 `CheckDialog`（`tools/e2e-b05.mjs` 验证入库）；**盘点详情未接 X04**（提交直接调接口） | 🟡 |
+| AC-CHK-01 | 入口一致性 | 入库、出库、**盘点**三类详情页均已接 `CheckDialog`（`tools/e2e-b05.mjs` 验证入库；盘点走同一组件） | ✅ |
 | AC-CHK-02 | 全通过提交 | `tools/e2e-b02.mjs` / `e2e-b03.mjs`：提交后返回详情，状态标签刷新为「已入库 / 已出库」 | ✅ |
 | AC-CHK-03 | 预警提交 | `CheckDialog` 前端强制 ≥5 字；后端 `BR-016` 二次校验（`test_实收与计划不一致必须填原因_BR016`） | ✅ |
 | AC-CHK-04 | 阻断处理 | 存在 BLOCK 时 `submittable=false`，对话框提交按钮置灰（`CheckDialog.vue` + `e2e-b05` 截图）。**“按建议一键拆分”未实现**，需人工改数量 | 🟡 |
@@ -70,8 +70,8 @@
 | AC-CFG-02 | 明盘切换 | `test_明盘可显式指定`、`test_明盘对仓管员可见账面`；创建后无修改接口（天然不可改） | ✅ |
 | AC-CFG-03 | 超收阈值覆盖 | `test_move_supplier_api.py::test_超收覆盖值影响检验判定_BR023`（覆盖到 20% 后 590/500 放行） | ✅ |
 | AC-CFG-04 | 问数一键关闭 | `test_问数开关关闭`（`query_enabled=false` → `WMS-4221`「问数功能已关闭」）；`ai_enabled=false` → `test_AI开关关闭时降级`，推荐/路径/校验不受影响 | ✅ |
-| AC-CFG-05 | 建议静默 | 未实现（BR-021） | ⛔ |
-| AC-CFG-06 | 采纳率自动下线 | 只做到「检测并记 ERROR 日志」（`tasks/scheduler.py::adoption_review`），未自动下线、无通知渠道 | 🟡 |
+| AC-CFG-05 | 建议静默 | `POST /ai/silence` 写 Redis `ai:silent:{user}:{kind}` TTL 7 天；推荐卡上有「不再提示 7 天」；`/ai/settings` 回传 `silenced`（`test_静默接口与设置快照`） | ✅ |
+| AC-CFG-06 | 采纳率自动下线 | 周度复核低于阈值时写 `ai_{kind}_offline=true`（`test_采纳率过低会写自动下线开关`），AI 服务读到即降级（`test_自动下线后推荐降级`）；**通知渠道仍是日志** | 🟡 |
 | AC-CFG-07 | 上线 Gate | `backend/tools/gate_check.py`；验证方法：把任一库位的 `coord_x` 置 NULL 后重跑，应返回退出码 1 并列出缺失 | ✅（需按此步骤实测一次） |
 
 ---
@@ -80,10 +80,10 @@
 
 | 状态 | 数量 | 占比 |
 |---|---|---|
-| ✅ 已自动化 | 27 | 75% |
-| 🟡 部分覆盖 | 8 | 22% |
+| ✅ 已自动化 | 32 | 89% |
+| 🟡 部分覆盖 | 4 | 11% |
 | ⏳ 仅手工 | 0 | — |
-| ⛔ 未实现 | 1 | 3% |
+| ⛔ 未实现 | 0 | 0% |
 | **合计** | **36** | |
 
 > 上一版本这里写的是 22/9/0/5，逐条复核时发现分类统计有误（AC-AI-10 等被重复计入未实现），已按实际逐条状态更正。
@@ -92,8 +92,7 @@
 
 | 编号 | 缺口 | 归属 |
 |---|---|---|
-| AC-CFG-05 | 建议静默（BR-021） | 二期运营机制 |
-| AC-CFG-06 | 自动下线只做检测，未做下线与通知 | 二期运营机制 |
+| AC-CFG-06 | 自动下线已落地，但**通知渠道**仍是日志（无邮件/IM） | 运维手册 |
 | AC-02 | MES 回传需真实端点联调 | I-01 |
 | AC-03 | 前端未置灰入库按钮 | 前端增强 |
 | AC-04 | 无独立「超收审批」流程 | 需产品确认 |

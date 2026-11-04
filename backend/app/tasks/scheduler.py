@@ -12,6 +12,7 @@ from sqlalchemy import delete, func, select
 from app.core.db import SessionLocal
 from app.core.logging import get_logger
 from app.domain.models import (
+    SysConfig,
     AiFeedback,
     AiSuggestion,
     InboundOrder,
@@ -91,10 +92,33 @@ def adoption_review() -> None:
             continue  # 样本太少不下结论
         rate = acc / base
         if rate < ADOPTION_OFFLINE_RATIO:
-            log.error("建议 %s 近 %d 周采纳率 %.0f%% < %.0f%%，应复核或下线（BR-022）",
+            _set_offline(kind, True)
+            log.error("建议 %s 近 %d 周采纳率 %.0f%% < %.0f%%，已自动下线（BR-022）",
                       kind, ADOPTION_WEEKS, rate * 100, ADOPTION_OFFLINE_RATIO * 100)
         else:
             log.info("建议 %s 采纳率 %.0f%%", kind, rate * 100)
+
+
+OFFLINE_KEY = {"LOCATION": "ai_location_offline", "PATH": "ai_path_offline",
+               "CHECK": "ai_check_offline"}
+
+
+def _set_offline(kind: str, value: bool) -> None:
+    """把自动下线开关写进 sys_config，AI 服务读它决定是否继续给建议。"""
+    key = OFFLINE_KEY.get(kind)
+    if not key:
+        return
+    with SessionLocal() as s:
+        row = s.execute(select(SysConfig).where(
+            SysConfig.cfg_key == key, SysConfig.scope == "GLOBAL",
+            SysConfig.scope_id.is_(None))).scalars().first()
+        val = "true" if value else "false"
+        if row is None:
+            s.add(SysConfig(cfg_key=key, cfg_value=val, value_type="BOOL",
+                            scope="GLOBAL", remark="BR-022 自动下线开关"))
+        else:
+            row.cfg_value = val
+        s.commit()
 
 
 def weekly_report() -> None:

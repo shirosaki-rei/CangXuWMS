@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { stocktakeApi, type Stocktake, type StocktakeItem } from '@/api/stocktake'
 import { useUserStore } from '@/stores/user'
+import CheckDialog from '@/components/CheckDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +14,7 @@ const loading = ref(false)
 const order = ref<Stocktake | null>(null)
 const items = ref<StocktakeItem[]>([])
 const canSubmit = ref(false)
+const checkRef = ref<InstanceType<typeof CheckDialog>>()
 
 /** 盲盘时后端根本不返回 book_qty，前端不用再判断，直接按字段有没有渲染 */
 const isBlind = computed(() => order.value?.mode === 'BLIND')
@@ -62,6 +64,11 @@ async function doCount() {
 
 // ---------------------------------------------------------------- 提交
 async function doSubmit() {
+  // 先过 X04：阻断级问题不允许提交（BR-017）
+  checkRef.value?.open('STOCKTAKE', id, async () => { await runSubmit() })
+}
+
+async function runSubmit() {
   await ElMessageBox.confirm(
     '提交后按差异生成「待执行」的盘亏出库单 / 盘盈入库单并解锁库位；' +
     '库存要等仓管员执行对应单据后才变动。确认提交？',
@@ -207,6 +214,8 @@ onMounted(async () => {
         <el-button type="primary" :loading="countDlg.saving" @click="doCount">保存</el-button>
       </template>
     </el-dialog>
+
+    <CheckDialog ref="checkRef" />
   </div>
 </template>
 

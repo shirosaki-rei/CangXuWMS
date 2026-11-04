@@ -88,6 +88,18 @@ export interface QueryResult {
   trace_id: string
 }
 
+export interface AiSettings {
+  ai_enabled: boolean
+  query_enabled: boolean
+  silenced: string[]
+  offline: string[]
+}
+
+export const settingsApi = {
+  get: () => get<AiSettings>('/ai/settings'),
+  silence: (kind: string, days = 7) => post('/ai/silence', { kind, days }),
+}
+
 export const queryApi = {
   ask: (question: string) => post<QueryResult>('/ai/query', { question }),
 }

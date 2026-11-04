@@ -436,3 +436,85 @@ def test_AC_AI_02_危品物料不推荐普通库位(seeded, client, kh, wh1_id):
     picked = {out["primary"]["location_id"]} if out["primary"] else set()
     picked |= {a["location_id"] for a in out["alternatives"]}
     assert 1 not in picked, "危品库位不该出现在普通物料的推荐里"
+
+
+# ---------------------------------------------------------------- 静默 / 自动下线 / 置灰依据
+def test_静默接口与设置快照(seeded, client, kh):
+    d = client.get("/api/v1/ai/settings", headers=kh).json()["data"]
+    assert d["ai_enabled"] is True and d["query_enabled"] is True
+    assert d["silenced"] == []
+
+    r = _post(client, "/api/v1/ai/silence", kh, {"kind": "LOCATION"})
+    assert r.json()["code"] == "0"
+    d2 = client.get("/api/v1/ai/settings", headers=kh).json()["data"]
+    assert "LOCATION" in d2["silenced"]
+
+
+def test_自动下线后推荐降级(seeded, client, ah, kh, wh1_id):
+    from sqlalchemy import select
+
+    from app.core.db import SessionLocal
+    from app.domain.models import Product
+
+    with SessionLocal() as s:
+        pid = s.execute(select(Product.id).where(Product.code == "A3288")).scalar_one()
+    client.put("/api/v1/sys-configs", headers={**ah, "X-Client-Op-Id": str(uuid.uuid4())},
+               json={"cfg_key": "ai_location_offline", "cfg_value": "true",
+                     "value_type": "BOOL"})
+    d = _post(client, "/api/v1/ai/locations/recommend", kh,
+              {"sku_type": "PRODUCT", "sku_id": pid, "warehouse_id": wh1_id,
+               "qty": 1, "pallet_count": 1}).json()["data"]
+    assert d["degraded"] is True
+    assert "自动下线" in d["reason"]
+
+
+def test_采购单未检验时不可提交_AC_03(seeded, client, ah):
+    from sqlalchemy import select
+
+    from app.core.db import SessionLocal
+    from app.domain.models import InboundOrder
+
+    with SessionLocal() as s:
+        oid = s.execute(select(InboundOrder.id).where(
+            InboundOrder.no == "PR20260127001")).scalar_one()
+        o = s.get(InboundOrder, oid)
+        o.source_no = "JY20260127001"  # 待检单
+        s.commit()
+
+    d = client.get(f"/api/v1/inbound-orders/{oid}", headers=ah).json()["data"]
+    assert d["submittable"] is False
+    assert "尚未判定" in d["purchase_block_reason"]
+
+    # 换成已检合格的单据即可提交
+    with SessionLocal() as s:
+        o = s.get(InboundOrder, oid)
+        o.source_no = "JY20260127002"
+        s.commit()
+    d2 = client.get(f"/api/v1/inbound-orders/{oid}", headers=ah).json()["data"]
+    assert d2["submittable"] is True and d2["purchase_block_reason"] is None
+
+
+def test_采纳率过低会写自动下线开关(seeded):
+    """直接喂 12 条 REJECT / 3 条 ACCEPT，复核应把 ai_location_offline 置 true。"""
+    from sqlalchemy import select
+
+    from app.core.db import SessionLocal
+    from app.domain.models import AiFeedback, AiSuggestion, SysConfig
+    from app.tasks import scheduler
+
+    with SessionLocal() as s:
+        for i in range(15):
+            sug = AiSuggestion(trace_id=f"t{i:031d}", type="LOCATION", target_id=1,
+                               payload={})
+            s.add(sug)
+            s.flush()
+            action = "ACCEPT" if i < 3 else "REJECT"
+            s.add(AiFeedback(suggestion_id=sug.id, action=action, operator_id=1))
+        s.commit()
+
+    scheduler.adoption_review()
+
+    with SessionLocal() as s:
+        row = s.execute(select(SysConfig).where(
+            SysConfig.cfg_key == "ai_location_offline")).scalars().first()
+    assert row is not None and row.cfg_value == "true"

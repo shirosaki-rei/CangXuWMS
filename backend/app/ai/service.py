@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.ai import check_engine, location_advisor, path_solver
 from app.core.errors import BizError, Codes
+from app.core.redis import rds
 from app.domain.enums import SkuType
 from app.domain.models import (
     AiFeedback,
@@ -50,6 +51,35 @@ def _cfg_dec(db: Session, key: str, default: str) -> Decimal:
         return Decimal(default)
 
 
+SILENCE_KEY = "ai:silent:{uid}:{kind}"
+OFFLINE_KEY = {"LOCATION": "ai_location_offline", "PATH": "ai_path_offline",
+               "CHECK": "ai_check_offline"}
+KINDS = ("LOCATION", "PATH", "CHECK")
+
+
+def is_silenced(user_id: int, kind: str) -> bool:
+    """BR-021：用户对某类建议点了「不再提示」，静默期内不展示。"""
+    return bool(rds.exists(SILENCE_KEY.format(uid=user_id, kind=kind)))
+
+
+def silence(user_id: int, kind: str, days: int = 7) -> None:
+    rds.set(SILENCE_KEY.format(uid=user_id, kind=kind), "1", ex=days * 86400)
+
+
+def _type_offline(db: Session, kind: str) -> bool:
+    """BR-022：连续 2 周采纳率过低后由定时任务置位，这里只读。"""
+    return _cfg_bool(db, OFFLINE_KEY[kind], False)
+
+
+def settings_snapshot(db: Session, user_id: int) -> dict:
+    return {
+        "ai_enabled": _cfg_bool(db, "ai_enabled"),
+        "query_enabled": _cfg_bool(db, "query_enabled"),
+        "silenced": [k for k in KINDS if is_silenced(user_id, k)],
+        "offline": [k for k in KINDS if _type_offline(db, k)],
+    }
+
+
 def _cfg_bool(db: Session, key: str, default: bool = True) -> bool:
     raw = get_config(db, key, "true" if default else "false")
     return str(raw).lower() in ("true", "1", "yes", "on")
@@ -61,6 +91,10 @@ def recommend_locations(ro: Session, *, sku_type: str, sku_id: int, warehouse_id
     if not _cfg_bool(ro, "ai_enabled"):
         return {"primary": None, "alternatives": [], "degraded": True,
                 "confidence": "LOW", "reason": "AI 建议已关闭（BR-020）",
+                "trace_id": _trace()}
+    if _type_offline(ro, "LOCATION"):
+        return {"primary": None, "alternatives": [], "degraded": True,
+                "confidence": "LOW", "reason": "库位推荐已自动下线（BR-022）",
                 "trace_id": _trace()}
 
     table = Product if sku_type == str(SkuType.PRODUCT) else Material
@@ -116,7 +150,7 @@ def save_suggestion(db: Session, *, trace_id: str, kind: str, target_id: int,
 # ---------------------------------------------------------------- 路径优化
 def optimize_path(ro: Session, *, order_id: int, order_type: str,
                   points: list[dict] | None) -> dict:
-    if not _cfg_bool(ro, "ai_enabled"):
+    if not _cfg_bool(ro, "ai_enabled") or _type_offline(ro, "PATH"):
         return {"sequence": [p["location_code"] for p in (points or [])], "degraded": True,
                 "algorithm": "DISABLED", "point_count": len(points or []),
                 "saved_pct": 0, "trace_id": _trace()}

@@ -107,6 +107,9 @@ def _order_dict(db: Session, o: InboundOrder, with_items: bool = False) -> dict:
         "version": o.version,
         "terminal": is_terminal("INBOUND", o.status),
     }
+    # 前端据此把「提交入库」置灰并提示原因（AC-03）
+    d["purchase_block_reason"] = purchase_block_reason(db, o)
+    d["submittable"] = d["purchase_block_reason"] is None
     if with_items:
         items = db.execute(
             select(InboundItem).where(InboundItem.order_id == o.id).order_by(InboundItem.id)
@@ -368,6 +371,24 @@ def _assert_no_blocking(db: Session, order_type: str, order_id: int) -> None:
             data={"blocking_rules": [r.rule for r in blocks],
                   "results": [r.to_dict() for r in blocks]},
         )
+
+
+def purchase_block_reason(db: Session, o: InboundOrder) -> str | None:
+    """采购单能否入库；不能时返回一句给前端直接展示的原因（AC-03）。"""
+    if o.type != str(InboundType.PURCHASE):
+        return None
+    if not o.source_no:
+        return "采购入库单必须关联检验单号（BR-004）"
+    insp = db.execute(
+        select(Inspection).where(Inspection.no == o.source_no)
+    ).scalar_one_or_none()
+    if insp is None:
+        return f"检验单 {o.source_no} 不存在"
+    if insp.status != "DONE":
+        return f"检验单 {o.source_no} 尚未判定完成，不能入库"
+    if insp.result not in ("PASS", "PARTIAL", "OVER_PASS"):
+        return f"检验单 {o.source_no} 判定为「{insp.result}」，不能入库"
+    return None
 
 
 def _assert_purchase_qualified(db: Session, o: InboundOrder) -> None:

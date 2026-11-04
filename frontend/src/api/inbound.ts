@@ -28,6 +28,9 @@ export interface InboundOrder {
   finished_at: string | null
   version: number
   terminal: boolean
+  /** 采购单是否满足入库前置条件（AC-03 置灰依据） */
+  submittable?: boolean
+  purchase_block_reason?: string | null
   box_code?: string | null
   location_id?: number | null
   items?: InboundItem[]
