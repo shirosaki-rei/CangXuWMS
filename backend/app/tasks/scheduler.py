@@ -10,7 +10,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from sqlalchemy import delete, func, select
 
 from app.core.db import SessionLocal
-from app.core.logging import get_logger
+from app.core.logging import get_logger, setup_logging
 from app.domain.models import (
     SysConfig,
     AiFeedback,
@@ -150,6 +150,7 @@ def open_diff_alert() -> None:
 
 
 def main() -> None:
+    setup_logging()  # worker 不做 FastAPI 启动，必须自己挂 handler，否则 INFO 全丢
     sched = BlockingScheduler(timezone="UTC")
     sched.add_job(reconcile_daily, "cron", hour=2, minute=0, id="reconcile")
     sched.add_job(close_stale_orders, "cron", hour=2, minute=10, id="stale")
