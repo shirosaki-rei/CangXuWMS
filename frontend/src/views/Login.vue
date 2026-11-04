@@ -12,6 +12,7 @@ const user = useUserStore()
 
 const loading = ref(false)
 const captchaImg = ref('')
+const capErr = ref('')
 const form = reactive({ username: '', password: '', captcha: '' })
 const rules: FormRules = {
   username: [{ required: true, message: '请输入账号', trigger: 'blur' }],
@@ -22,10 +23,17 @@ const formRef = ref<FormInstance>()
 let captchaId = ''
 
 async function refreshCaptcha() {
-  const c = await authApi.captcha()
-  captchaId = c.captcha_id
-  captchaImg.value = c.image
-  form.captcha = ''
+  try {
+    const c = await authApi.captcha()
+    captchaId = c.captcha_id
+    captchaImg.value = c.image
+    form.captcha = ''
+    capErr.value = ''
+  } catch (e: any) {
+    // 不能静默失败：后端不可达时这里会空一块，看起来像「验证码图没了」
+    captchaImg.value = ''
+    capErr.value = e?.message ? `验证码加载失败：${e.message}` : '验证码加载失败，点击重试'
+  }
 }
 
 async function onSubmit() {
@@ -69,6 +77,9 @@ refreshCaptcha()
           <div class="cap-row">
             <el-input v-model="form.captcha" placeholder="4 位字符" size="large" maxlength="4" />
             <img v-if="captchaImg" :src="captchaImg" class="cap-img" title="点击刷新" @click="refreshCaptcha" />
+            <div v-else class="cap-img cap-err" title="点击重试" @click="refreshCaptcha">
+              {{ capErr || '点击重试' }}
+            </div>
           </div>
         </el-form-item>
         <el-button type="primary" size="large" class="login-btn" :loading="loading" @click="onSubmit">
@@ -111,6 +122,10 @@ refreshCaptcha()
 .login-hd p { margin: 2px 0 0; font-size: 11px; color: #9aa4af; letter-spacing: 0.5px; }
 .cap-row { display: flex; gap: 10px; width: 100%; }
 .cap-row .el-input { flex: 1; }
+.cap-err {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: #d03050; padding: 0 6px; text-align: center; line-height: 1.3;
+}
 .cap-img {
   width: 120px;
   height: 40px;
