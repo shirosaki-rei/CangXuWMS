@@ -346,6 +346,18 @@ B01-1 骨架 ──┬─> B01-2 compose ──> B01-3 建表+seed ──┬─>
 
 后三条都卡在**产品口径**而不是实现难度上，建议先确认再动。
 
+## 1.12 工程债：限流 + 备份定时任务（2026-11-04）
+
+| 项 | 内容 |
+|---|---|
+| 限流 | `middleware/ratelimit.py`，固定窗口（Redis INCR + 60s TTL）。桶：写接口 600/min·身份、`/sync/push` 10/min·身份、`/ai/query` 全局 300/min、集成 1000/min·app_key；LLM 仍由网关单独限 60/min·用户。超限返 `WMS-4290` + HTTP 429，响应体带 `bucket`/`limit` 便于客户端退避 |
+| 身份 | 中间件在鉴权之前跑，拿不到 user_id → 用 `Authorization` 头摘要做键，其次 `X-App-Key`，最后 IP |
+| 豁免 | `/health` `/metrics` `/docs` 与 `/auth/captcha|login|refresh`（**不带 api 前缀会导致登录被限流，把人挡在门外**——实施时踩到） |
+| 备份 | `tasks/backup.py`：mysqldump `--single-transaction` → gzip → 保留 7 天；由调度器 03:00 执行。找不到 mysqldump 只记 ERROR 不崩溃 |
+| 镜像 | Dockerfile 装 `default-mysql-client`；compose 的 worker 挂载 `./volumes/backup:/backup` 并设 `BACKUP_DIR=/backup` |
+
+**注意**：`tools/backup.sh` 与 `tasks/backup.py` 并存——前者用于手工/CI，后者用于容器内的定时任务，二者轮转策略一致（7 天）。
+
 ## 2. 批次门禁（DoD，每批次通用）
 
 沿用任务清单第 9 章，另加三条本表专用：

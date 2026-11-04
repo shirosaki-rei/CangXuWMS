@@ -176,7 +176,21 @@ LLM 默认**不接**（`LLM_BASE_URL` 为空）：库位推荐、路径、校验
 PYTHONPATH=. ./.venv/Scripts/python.exe tools/gate_check.py
 ```
 
-定时任务由 compose 的 `worker` 容器执行（`python -m app.tasks.scheduler`），单实例运行。
+定时任务由 compose 的 `worker` 容器执行（`python -m app.tasks.scheduler`），单实例运行：
+02:00 对账 / 02:10 超期告警 / 02:20 差异告警 / **03:00 备份** / 03:30 清理 / 周一采纳率复核与周报。
+
+### 限流（接口文档 5.5）
+
+| 对象 | 限额 | 桶键 |
+|---|---|---|
+| 普通写接口 | 600 次/分 | 用户（Authorization 摘要） |
+| `/sync/push` | 10 次/分 | 用户 |
+| `/ai/query` | 300 次/分 | 全局 |
+| 集成接口 | 1000 次/分 | app_key |
+| LLM 调用 | 60 次/分 | 用户（网关内单独做） |
+
+超限返回 HTTP 429 + `WMS-4290`，`data` 里带 `bucket` 与 `limit`。
+限额可在 `backend/.env` 用 `RL_WRITE` / `RL_SYNC_PUSH` / `RL_AI_QUERY` / `RL_INTEGRATION` 调整。
 
 ## 关键约定
 

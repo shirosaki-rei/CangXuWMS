@@ -26,6 +26,7 @@ from app.core.db import SessionLocal, engine
 from app.core.errors import Codes, ok, register_error_handlers
 from app.core.logging import get_logger, setup_logging
 from app.middleware.idempotency import IdempotencyMiddleware
+from app.middleware.ratelimit import RateLimitMiddleware
 from app.middleware.raw_body import RawBodyMiddleware
 from app.middleware.trace import TraceMiddleware
 from app.core.redis import rds
@@ -58,6 +59,8 @@ def create_app() -> FastAPI:
     app.add_middleware(IdempotencyMiddleware)
     app.add_middleware(TraceMiddleware)
     app.add_middleware(RawBodyMiddleware)
+    # 限流放在 CORS 之内、其余之外：429 也要带 CORS 头，否则浏览器只会报跨域错误
+    app.add_middleware(RateLimitMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,

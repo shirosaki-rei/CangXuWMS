@@ -21,7 +21,7 @@ from app.domain.models import (
     OutboundOrder,
     ReconcileDiff,
 )
-from app.tasks import reconcile
+from app.tasks import backup, reconcile
 
 log = get_logger("wms.tasks")
 
@@ -41,6 +41,13 @@ def reconcile_daily() -> None:
             reconcile.run(s)
     except Exception:  # noqa: BLE001
         log.exception("daily reconcile failed")
+
+
+def backup_daily() -> None:
+    try:
+        backup.run()
+    except Exception:  # noqa: BLE001
+        log.exception("daily backup failed")
 
 
 def cleanup_old_records() -> None:
@@ -147,7 +154,8 @@ def main() -> None:
     sched.add_job(reconcile_daily, "cron", hour=2, minute=0, id="reconcile")
     sched.add_job(close_stale_orders, "cron", hour=2, minute=10, id="stale")
     sched.add_job(open_diff_alert, "cron", hour=2, minute=20, id="diff-alert")
-    sched.add_job(cleanup_old_records, "cron", hour=3, minute=0, id="cleanup")
+    sched.add_job(backup_daily, "cron", hour=3, minute=0, id="backup")
+    sched.add_job(cleanup_old_records, "cron", hour=3, minute=30, id="cleanup")
     sched.add_job(adoption_review, "cron", day_of_week="mon", hour=9, minute=0,
                   id="adoption")
     sched.add_job(weekly_report, "cron", day_of_week="mon", hour=9, minute=10,

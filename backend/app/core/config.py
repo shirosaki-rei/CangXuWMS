@@ -25,6 +25,16 @@ class Settings(BaseSettings):
     refresh_ttl: int = 604800
     idle_ttl: int = 28800  # 8h 无操作作废
 
+    # ---- 限流（接口文档 5.5，单位：次/分钟）----
+    rl_write: int = 600
+    rl_sync_push: int = 10
+    rl_ai_query: int = 300
+    rl_integration: int = 1000
+    rl_llm: int = 60
+
+    # ---- 备份 ----
+    backup_dir: str = "./volumes/backup"
+
     captcha_ttl: int = 300
     login_fail_max: int = 5
     login_lock_minutes: int = 10

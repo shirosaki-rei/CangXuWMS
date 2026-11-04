@@ -6,6 +6,9 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /srv
 
+# mysqldump：每日备份用（app/tasks/backup.py）
+RUN apt-get update  && apt-get install -y --no-install-recommends default-mysql-client  && rm -rf /var/lib/apt/lists/*
+
 # 先装依赖再拷代码，利用层缓存
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
