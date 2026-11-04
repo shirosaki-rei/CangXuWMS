@@ -60,6 +60,7 @@ const groups = computed<MenuGroup[]>(() => {
     {
       name: 'AI 建议层',
       items: [
+        { path: '/ai/query', title: '智能问数', perm: 'ai:query' },
         { path: '/ai/dashboard', title: 'AI 效果看板', perm: 'ai:dashboard' },
       ].filter((i) => can(i.perm)),
     },

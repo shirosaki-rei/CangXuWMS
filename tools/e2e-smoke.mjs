@@ -8,13 +8,13 @@ const OUT = process.argv[2] ?? '/tmp/wms-e2e'
 // E2E_BASE 指向被测站点：5173 是 vite dev，8080 是 docker compose 的 nginx
 const URL_BASE = process.env.E2E_BASE ?? 'http://localhost:5173'
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
-const PORT = 9333
+const PORT = 9501
 
 mkdirSync(OUT, { recursive: true })
 
 const chrome = spawn(CHROME, [
   '--headless=new', '--disable-gpu', '--no-sandbox', '--hide-scrollbars',
-  `--remote-debugging-port=${PORT}`, '--window-size=1440,900',
+  `--remote-debugging-port=${PORT}`, `--user-data-dir=/tmp/wms-e2e-prof-${PORT}`, '--window-size=1440,900',
   'about:blank',
 ], { stdio: 'ignore' })
 

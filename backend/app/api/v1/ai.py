@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.ai import service as ai
-from app.core.deps import CurrentUser, DbDep, ReadOnlyDep
+from app.core.deps import CurrentUser, DbDep, ReadOnlyDep, WarehouseScope
 from app.core.errors import Codes, ok
 from app.domain.models import AiSuggestion
 
@@ -37,6 +37,10 @@ class OptimizeReq(BaseModel):
     order_id: int | None = None
     order_type: str = Field("SALES", pattern=r"^(SALES|PICK|LOSS)$")
     points: list[PickPoint] | None = None
+
+
+class QueryReq(BaseModel):
+    question: str = Field(..., min_length=2, max_length=255)
 
 
 class FeedbackReq(BaseModel):
@@ -118,3 +122,13 @@ def get_suggestion(request: Request, db: DbDep, sid: int, user: CurrentUser) -> 
                "target_id": row.target_id, "payload": row.payload,
                "score": float(row.score) if row.score is not None else None,
                "reasons": row.reasons}, trace_id=request.state.trace_id)
+
+
+@router.post("/query", summary="自然语言问数（接口 55 / X01，只读）")
+def query(request: Request, db: DbDep, ro: ReadOnlyDep, scope: WarehouseScope,
+          body: QueryReq, user: CurrentUser) -> dict:
+    from app.ai.nl_query import service as nq
+
+    # 数据权限：仓管员/检验员只查可见仓库，主管/管理员不限（AC-AI-12）
+    return ok(nq.ask(ro, db, question=body.question, user_id=user.id, warehouse_ids=scope),
+              trace_id=request.state.trace_id)

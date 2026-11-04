@@ -106,6 +106,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '供应商档案', perm: 'inventory:view' },
       },
       {
+        path: 'ai/query',
+        name: 'ai-query',
+        component: () => import('@/views/ai/QueryView.vue'),
+        meta: { title: '智能问数', perm: 'ai:query' },
+      },
+      {
         path: 'ai/dashboard',
         name: 'ai-dashboard',
         component: () => import('@/views/ai/AiDashboard.vue'),

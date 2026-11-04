@@ -46,11 +46,11 @@
 | AC-AI-05 | 校验阻断级 | `test_ai.py::test_出库可用库存不足时提交被阻断`（submit 返回 `WMS-4221` + `blocking_rules`）、`test_R3库位类型不符是阻断` | ✅ |
 | AC-AI-06 | 校验预警级 | `test_ai.py::test_R1数量偏差预警`；原因 ≥5 字：`test_inbound_api.py::test_实收与计划不一致必须填原因_BR016`（写入 `config_snapshot.submit_reason`） | ✅ |
 | AC-AI-07 | 校验性能 | `test_ai.py::test_AC_AI_07_全部规则三秒内跑完`（200 条明细，实测毫秒级） | ✅ |
-| AC-AI-08 | 问数只读 | 问数（X01）**按计划进二期**；语义层与 `guard.py` 未实现 | ⛔ |
-| AC-AI-09 | 问数口径 | 同上 | ⛔ |
-| AC-AI-10 | LLM 降级 | `llm_gateway.py` 在 `LLM_BASE_URL` 为空时直接返回降级（默认即此状态）；推荐/路径/校验完全不依赖 LLM：`test_ai.py` 全部在无 LLM 下通过。**“问数入口隐藏”** 随 X01 二期 | 🟡 |
+| AC-AI-08 | 问数只读 | `test_nl_query.py::test_guard拒绝危险SQL`（8 种写/多语句/注释/超限写法全被拒）、`test_guard放行合法查询`；拒绝原因写入 `nl_query_log.rejected` | ✅ |
+| AC-AI-09 | 问数口径 | `test_同一问题两次结果一致_AC_AI_09`（同一问题 SQL 与结果完全相同——SQL 来自模板，不是模型生成） | ✅ |
+| AC-AI-10 | LLM 降级 | 问数在无 LLM 时照常返回数据表（意图解析是规则版，不依赖模型）：`test_nl_query.py` 全部在无 LLM 下通过；`llm_gateway` 超时/断网返回模板文案并标 `degraded`。**菜单里的入口仍显示**，只是调用会明确报「已关闭」 | 🟡 |
 | AC-AI-11 | 采纳反馈 | `test_ai.py::test_反馈与采纳率`（ACCEPT/REJECT 落库，`/ai/metrics` 按场景出采纳率） | ✅ |
-| AC-AI-12 | 权限隔离 | 问数二期；其余接口的数据权限：`test_basedata_api.py::test_仓管员显式传未分配仓库被拒_WMS4030` | 🟡 |
+| AC-AI-12 | 权限隔离 | 问数：`test_仓管员查不到未授权仓库_AC_AI_12`（WH-003 的数据仓管员查不到，SQL 里强制注入 `warehouse_id IN (...)`）；其余接口见 `test_仓管员显式传未分配仓库被拒_WMS4030` | ✅ |
 
 ## 3. 提交校验流程（AC-CHK-01 ~ AC-CHK-05）
 
@@ -69,7 +69,7 @@
 | AC-CFG-01 | 盲盘模式 | `test_stocktake_api.py::test_盲盘对仓管员隐藏账面`（字段不返回）、`test_盲盘实盘响应也不揭晓差异`；`e2e-b04.mjs` 双账号验证 | ✅ |
 | AC-CFG-02 | 明盘切换 | `test_明盘可显式指定`、`test_明盘对仓管员可见账面`；创建后无修改接口（天然不可改） | ✅ |
 | AC-CFG-03 | 超收阈值覆盖 | `test_move_supplier_api.py::test_超收覆盖值影响检验判定_BR023`（覆盖到 20% 后 590/500 放行） | ✅ |
-| AC-CFG-04 | 问数一键关闭 | `ai_enabled=false` → `test_AI开关关闭时降级`；`query_enabled` 只影响未实现的问数 | 🟡 |
+| AC-CFG-04 | 问数一键关闭 | `test_问数开关关闭`（`query_enabled=false` → `WMS-4221`「问数功能已关闭」）；`ai_enabled=false` → `test_AI开关关闭时降级`，推荐/路径/校验不受影响 | ✅ |
 | AC-CFG-05 | 建议静默 | 未实现（BR-021） | ⛔ |
 | AC-CFG-06 | 采纳率自动下线 | 只做到「检测并记 ERROR 日志」（`tasks/scheduler.py::adoption_review`），未自动下线、无通知渠道 | 🟡 |
 | AC-CFG-07 | 上线 Gate | `backend/tools/gate_check.py`；验证方法：把任一库位的 `coord_x` 置 NULL 后重跑，应返回退出码 1 并列出缺失 | ✅（需按此步骤实测一次） |
@@ -80,17 +80,18 @@
 
 | 状态 | 数量 | 占比 |
 |---|---|---|
-| ✅ 已自动化 | 22 | 61% |
-| 🟡 部分覆盖 | 9 | 25% |
+| ✅ 已自动化 | 27 | 75% |
+| 🟡 部分覆盖 | 8 | 22% |
 | ⏳ 仅手工 | 0 | — |
-| ⛔ 未实现 | 5 | 14% |
+| ⛔ 未实现 | 1 | 3% |
 | **合计** | **36** | |
+
+> 上一版本这里写的是 22/9/0/5，逐条复核时发现分类统计有误（AC-AI-10 等被重复计入未实现），已按实际逐条状态更正。
 
 ### 未实现或有缺口的明细
 
 | 编号 | 缺口 | 归属 |
 |---|---|---|
-| AC-AI-08 / 09 / 12 | 问数（X01）整体在二期 | T-04-6 |
 | AC-CFG-05 | 建议静默（BR-021） | 二期运营机制 |
 | AC-CFG-06 | 自动下线只做检测，未做下线与通知 | 二期运营机制 |
 | AC-02 | MES 回传需真实端点联调 | I-01 |

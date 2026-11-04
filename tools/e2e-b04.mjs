@@ -6,12 +6,12 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 const OUT = process.argv[2] ?? '/tmp/wms-b04'
 const BASE = process.env.E2E_BASE ?? 'http://localhost:5173'
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
-const PORT = 9338
+const PORT = 9504
 
 mkdirSync(OUT, { recursive: true })
 const chrome = spawn(CHROME, [
   '--headless=new', '--disable-gpu', '--no-sandbox', '--hide-scrollbars',
-  `--remote-debugging-port=${PORT}`, '--window-size=1440,900', 'about:blank',
+  `--remote-debugging-port=${PORT}`, `--user-data-dir=/tmp/wms-e2e-prof-${PORT}`, '--window-size=1440,900', 'about:blank',
 ], { stdio: 'ignore' })
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))

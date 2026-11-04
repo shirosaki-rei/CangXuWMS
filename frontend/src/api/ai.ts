@@ -75,3 +75,19 @@ export const aiApi = {
     post('/ai/feedback', { suggestion_id: suggestionId, action, reason }),
   metrics: (days = 30) => get<Metrics>('/ai/metrics', { days }),
 }
+
+export interface QueryResult {
+  conclusion: string
+  table: { columns: string[]; rows: any[][] }
+  caliber: string | null
+  metric: string | null
+  sql: string | null
+  row_count: number
+  updated_at: string
+  degraded: boolean
+  trace_id: string
+}
+
+export const queryApi = {
+  ask: (question: string) => post<QueryResult>('/ai/query', { question }),
+}

@@ -5,10 +5,10 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 const OUT = process.argv[2] ?? '/tmp/wms-b05'
 const BASE = process.env.E2E_BASE ?? 'http://localhost:5173'
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
-const PORT = 9339
+const PORT = 9505
 mkdirSync(OUT, { recursive: true })
 const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-sandbox',
-  '--hide-scrollbars', `--remote-debugging-port=${PORT}`, '--window-size=1440,900',
+  '--hide-scrollbars', `--remote-debugging-port=${PORT}`, `--user-data-dir=/tmp/wms-e2e-prof-${PORT}`, '--window-size=1440,900',
   'about:blank'], { stdio: 'ignore' })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -99,6 +99,20 @@ try {
   check('看板有采纳数据', (m.body.data?.adoption?.length ?? 0) >= 1, why(m))
 
   // 页面走查
+  // X01 问数：提问 → 结论 + 表格 + 可展开 SQL
+  await cdp.send('Page.navigate', { url: `${BASE}/ai/query?cb=${Date.now()}` })
+  await sleep(2500)
+  await cdp.eval(`(() => {
+    const set = (el, v) => { const d = Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value').set; d.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })) }
+    set(document.querySelector('.ask input'), '近 7 天入库多少')
+  })()`)
+  await cdp.eval(`[...document.querySelectorAll('button')].find(b => b.textContent.trim() === '提问').click()`)
+  await sleep(2500)
+  const qtxt = await cdp.eval('document.body.innerText')
+  check('X01 返回结论与口径', qtxt.includes('入库数量合计') || qtxt.includes('没有入库数量记录'),
+        qtxt.includes('口径') ? '带口径说明' : '')
+  await cdp.shot('03-x01-query')
+
   await cdp.send('Page.navigate', { url: `${BASE}/ai/dashboard?cb=${Date.now()}` })
   await sleep(2500)
   const txt = await cdp.eval('document.body.innerText')

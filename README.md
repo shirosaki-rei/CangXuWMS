@@ -118,7 +118,8 @@ backend/app/
 │   ├── location_advisor.py  # X02 五维打分 + 分差置信度
 │   ├── path_solver.py       # X03 三档算法
 │   ├── check_engine.py      # X04 11 条规则
-│   └── llm_gateway.py       # T-04-5 超时/重试/降级/脱敏/限流
+│   ├── llm_gateway.py       # T-04-5 超时/重试/降级/脱敏/限流
+│   └── nl_query/            # X01 问数：intent 规则解析 + semantics 模板 + guard 白名单
 ├── tasks/
 │   ├── scheduler.py         # APScheduler：对账/清理/采纳率复核/周报
 │   └── reconcile.py         # 每日对账
