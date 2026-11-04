@@ -2,7 +2,7 @@ import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestCo
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { uuidv4 } from '@/utils/uuid'
-import { hintOf, isBizError, SILENT_CODES } from '@/utils/errorcode'
+import { messageOf, isBizError, SILENT_CODES } from '@/utils/errorcode'
 
 const BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
@@ -43,7 +43,7 @@ http.interceptors.response.use(
       return Promise.reject(body)
     }
     if (!SILENT_CODES.has(code)) {
-      ElMessage.error(hintOf(code, body.message ?? '请求失败'))
+      ElMessage.error(messageOf(code, body.message))
     }
     return Promise.reject(body)
   },
@@ -54,7 +54,7 @@ http.interceptors.response.use(
         useUserStore().reset()
         location.assign('/login')
       } else if (!SILENT_CODES.has(data.code)) {
-        ElMessage.error(hintOf(data.code, data.message ?? '请求失败'))
+        ElMessage.error(messageOf(data.code, data.message))
       }
       return Promise.reject(data)
     }

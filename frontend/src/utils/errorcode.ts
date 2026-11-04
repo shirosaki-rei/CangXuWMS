@@ -32,6 +32,21 @@ export function isBizError(e: unknown): e is BizError {
   return typeof e === 'object' && e !== null && 'code' in e && typeof (e as BizError).code === 'string'
 }
 
-export function hintOf(code: string, fallback: string): string {
-  return CODE_HINT[code] ?? fallback
+/**
+ * 这几种码后端的 message 对用户没意义（多是英文内部信息），固定用映射文案。
+ */
+const PREFER_HINT = new Set(['WMS-5000', 'WMS-4011'])
+
+/**
+ * 优先用后端给出的具体 message。
+ *
+ * 后端 BizError 的 message 是「用户名或密码错误」「密码连续错误已达上限，账号锁定中，
+ * 请 7 分钟后重试」这类可操作信息；而 CODE_HINT 里 WMS-4221 只有一句「不满足业务规则」。
+ * 若用映射覆盖，登录失败这类最需要诊断的场景反而只剩一句废话。
+ * 所以映射表只作兜底：后端没给 message、或码属于 PREFER_HINT 时才用。
+ */
+export function messageOf(code: string, backendMessage?: string): string {
+  const msg = (backendMessage ?? '').trim()
+  if (msg && !PREFER_HINT.has(code)) return msg
+  return CODE_HINT[code] ?? msg ?? '请求失败'
 }
