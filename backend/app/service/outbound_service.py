@@ -332,9 +332,12 @@ def submit(db: Session, order_id: int, req: OutboundSubmitReq, operator_id: int)
     if is_terminal("OUTBOUND", o.status):
         raise BizError(Codes.ORDER_CLOSED, f"出库单已终态（{o.status}）")
 
+    # 盘亏单由盘点生成，明细在提交前就定好了（数量来自实盘），
+    # 仓管员只需确认实物已出库 —— 所以 PENDING 行也直接发。
+    statuses = ("PICKED", "PENDING") if o.type == str(OutboundType.LOSS) else ("PICKED",)
     pending = db.execute(
         select(OutboundItem).where(
-            OutboundItem.order_id == o.id, OutboundItem.status == "PICKED"
+            OutboundItem.order_id == o.id, OutboundItem.status.in_(statuses)
         )
     ).scalars().all()
     if not pending:

@@ -63,14 +63,15 @@ async function doCount() {
 // ---------------------------------------------------------------- 提交
 async function doSubmit() {
   await ElMessageBox.confirm(
-    '提交后将按差异生成盘亏出库单 / 盘盈入库单，并调整库存、解锁库位。确认提交？',
+    '提交后按差异生成「待执行」的盘亏出库单 / 盘盈入库单并解锁库位；' +
+    '库存要等仓管员执行对应单据后才变动。确认提交？',
     '提交盘点',
     { type: 'warning' },
   )
   const r = await stocktakeApi.submit(id)
   const parts = [`盘亏 ${r.diff_loss} 条`, `盘盈 ${r.diff_gain} 条`]
-  if (r.loss_no) parts.push(`盘亏单 ${r.loss_no}`)
-  if (r.gain_no) parts.push(`盘盈单 ${r.gain_no}`)
+  if (r.loss_no) parts.push(`盘亏单 ${r.loss_no}（待执行）`)
+  if (r.gain_no) parts.push(`盘盈单 ${r.gain_no}（待执行）`)
   ElMessage.success(parts.join('，'))
   await load()
 }
@@ -128,6 +129,14 @@ onMounted(async () => {
           <el-descriptions-item label="创建时间">{{ order.created_at }}</el-descriptions-item>
           <el-descriptions-item label="完成时间">{{ order.finished_at ?? '—' }}</el-descriptions-item>
         </el-descriptions>
+        <el-alert
+          v-if="order.status === 'DONE' && (order.diff_loss || order.diff_gain)"
+          class="mt8"
+          type="info"
+          :closable="false"
+          show-icon
+          title="盈亏单据已生成但尚未执行，库存未变动；请到「出库单 / 入库单」里执行对应单据"
+        />
         <el-alert
           v-if="hideBook"
           class="mt8"

@@ -182,10 +182,25 @@ try {
   check('提交盘点生成盈亏单据', submitted.body.code === '0' && d?.status === 'DONE',
         `${d?.loss_no ?? '无盘亏单'} / ${d?.gain_no ?? '无盘盈单'} ${why(submitted)}`)
   check('盘亏 1 条', d?.diff_loss === 1, `loss=${d?.diff_loss}`)
+  check('单据为待执行', d?.docs_pending === true)
+
+  // 两步走：盘点提交本身不动库存
+  const mid = await cdp.eval(api('GET', '/api/v1/inventory/materials', null, adminToken))
+  const rowMid = mid.body.data.items.find((m) => m.code === row.code)
+  check('盘点提交不扣库存', rowMid.qty === row.qty, `仍为 ${rowMid.qty}`)
+
+  // 仓管员执行盘亏出库单
+  const sl = await cdp.eval(api('GET', `/api/v1/outbound-orders?no=${d.loss_no}`, null, shToken))
+  const slId = sl.body.data.items[0].id
+  const slStatus = sl.body.data.items[0].status
+  check('盘亏单已生成且待执行', slStatus === 'PENDING', `${d.loss_no} ${slStatus}`)
+
+  const exec = await cdp.eval(api('POST', `/api/v1/outbound-orders/${slId}/submit`, {}, keeperToken))
+  check('执行盘亏出库单', exec.body.code === '0' && exec.body.data.status === 'DONE', why(exec))
 
   const after = await cdp.eval(api('GET', '/api/v1/inventory/materials', null, adminToken))
   const rowAfter = after.body.data.items.find((m) => m.code === row.code)
-  check('库存已按盘亏调整', rowAfter.qty === row.qty - 5, `${row.qty} → ${rowAfter.qty}`)
+  check('执行后库存扣减', rowAfter.qty === row.qty - 5, `${row.qty} → ${rowAfter.qty}`)
 
   const unlocked = await cdp.eval(api('GET', '/api/v1/locations?page=1&page_size=100', null, shToken))
   check('提交后解锁库位',

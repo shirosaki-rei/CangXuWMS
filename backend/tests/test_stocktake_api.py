@@ -211,7 +211,8 @@ def test_库位不属于本仓被拒(stocked, client, sh, kh, wh3_id):
 
 
 # ---------------------------------------------------------------- 提交与盈亏
-def test_盘亏生成SL单并扣库存(stocked, client, sh, kh):
+def test_盘亏生成待执行SL单且库存暂不变(stocked, client, sh, kh):
+    """两步走：盘点提交只出单，库存要等仓管员执行盘亏出库单才动（PRD 6.5.3）。"""
     mat, loc = stocked["material_id"], stocked["loc_a"]
     assert _qty(mat, loc) == 100
     sid = _create(client, sh, stocked["warehouse_id"]).json()["data"]["id"]
@@ -227,22 +228,34 @@ def test_盘亏生成SL单并扣库存(stocked, client, sh, kh):
     assert d["status"] == "DONE"
     assert d["diff_loss"] == 1 and d["diff_gain"] == 0
     assert d["loss_no"].startswith("SL")
+    assert d["docs_pending"] is True
 
-    assert _qty(mat, loc) == 92, "盘亏 8 件要从库存扣掉"
-    assert _qty(mat, stocked["loc_b"]) == 50, "无差异的库位不动"
+    # 关键：单据已生成，但库存还没动
+    assert _qty(mat, loc) == 100, "盘点提交本身不扣库存"
 
     with SessionLocal() as s:
         o = s.execute(select(OutboundOrder).where(
             OutboundOrder.no == d["loss_no"])).scalar_one()
-        assert o.type == "LOSS" and o.status == "DONE"
+        assert o.type == "LOSS" and o.status == "PENDING"
         assert o.source_no.startswith("PD")
-        # 流水按单据号写入，可追溯
         n = s.execute(select(func.count()).select_from(Txn).where(
             Txn.biz_no == d["loss_no"])).scalar()
-        assert n == 1
+        assert n == 0, "还没执行，不该有流水"
+
+    # 仓管员执行盘亏出库单 → 这时才扣库存
+    r = _post(client, f"/api/v1/outbound-orders/{o.id}/submit", kh, {})
+    assert r.json()["code"] == "0", r.text
+    assert r.json()["data"]["status"] == "DONE"
+    assert _qty(mat, loc) == 92, "执行后盘亏 8 件扣掉"
+    assert _qty(mat, stocked["loc_b"]) == 50, "无差异的库位不动"
+
+    with SessionLocal() as s:
+        n = s.execute(select(func.count()).select_from(Txn).where(
+            Txn.biz_no == d["loss_no"])).scalar()
+        assert n == 1, "库存调整流水在单据执行时写入"
 
 
-def test_盘盈生成SG单并加库存(stocked, client, sh, kh):
+def test_盘盈生成待执行SG单_执行后才加库存(stocked, client, sh, kh):
     mat, loc = stocked["material_id"], stocked["loc_a"]
     sid = _create(client, sh, stocked["warehouse_id"]).json()["data"]["id"]
     _post(client, f"/api/v1/stocktakes/{sid}/count", kh,
@@ -253,12 +266,17 @@ def test_盘盈生成SG单并加库存(stocked, client, sh, kh):
     d = _post(client, f"/api/v1/stocktakes/{sid}/submit", sh, {}).json()["data"]
     assert d["diff_gain"] == 1 and d["diff_loss"] == 0
     assert d["gain_no"].startswith("SG")
-    assert _qty(mat, loc) == 108
+    assert _qty(mat, loc) == 100, "盘点提交本身不加库存"
 
     with SessionLocal() as s:
         o = s.execute(select(InboundOrder).where(
             InboundOrder.no == d["gain_no"])).scalar_one()
-        assert o.type == "GAIN" and o.status == "DONE"
+        assert o.type == "GAIN" and o.status == "PENDING"
+
+    # 仓管员执行盘盈入库单
+    r = _post(client, f"/api/v1/inbound-orders/{o.id}/submit", kh, {})
+    assert r.json()["code"] == "0", r.text
+    assert _qty(mat, loc) == 108
 
 
 def test_提交后解锁库位(stocked, client, sh, kh):
@@ -275,7 +293,7 @@ def test_提交后解锁库位(stocked, client, sh, kh):
         assert locked == 0, "提交后必须解锁"
         # 有库存的库位应回到「占用」
         loc = s.get(Location, stocked["loc_a"])
-        assert loc.status == "OCCUPIED"
+        assert loc.status == "OCCUPIED"  # 库位里仍有 100 件
 
 
 def test_无差异不生成单据(stocked, client, sh, kh):

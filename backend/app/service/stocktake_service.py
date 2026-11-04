@@ -39,7 +39,6 @@ from app.domain.models import (
     Warehouse,
 )
 from app.domain.rules import gen_no, location_status_after
-from app.domain.stock import Move, apply_many
 from app.schemas.stocktake import CountReq, StocktakeCreateReq, StocktakeSubmitReq
 from app.service.admin_service import get_config
 
@@ -311,12 +310,13 @@ def count(db: Session, sid: int, body: CountReq, operator_id: int) -> dict:
 
 # ---------------------------------------------------------------- 提交
 def submit(db: Session, sid: int, body: StocktakeSubmitReq, operator_id: int) -> dict:
-    """提交盘点（接口 31）：生成盈亏单据 + 写库存调整流水 + 解锁库位。
+    """提交盘点（接口 31）：生成**待执行**的盈亏单据并解锁库位。
 
-    ponytail: 盈亏单据直接落成 DONE 并当场调整库存，不再要求仓管员去执行一张
-    「盘亏出库单」。PRD 6.6.3 写的是「提交后生成盈亏单据并写库存调整流水」，
-    物理执行那一步在盘点时已经做完了。若以后要拆成两步，把 apply_many 挪到
-    对应单据的 submit 即可。
+    两步走（PRD 6.5.3「盘亏出库单由主管确认后自动生成，仓管员只执行实物出库」）：
+      - 本接口只出单，库存**不动**
+      - 仓管员执行对应的盘亏出库单 / 盘盈入库单时才写库存流水
+
+    这样账面差异在实物处理完之前始终可见，符合现场「先盘点、再出库」的顺序。
     """
     s = db.get(Stocktake, sid)
     if s is None:
@@ -340,50 +340,38 @@ def submit(db: Session, sid: int, body: StocktakeSubmitReq, operator_id: int) ->
     docs = {"loss_no": None, "gain_no": None}
 
     if loss:
-        # 盘亏出库单 SL
+        # 盘亏出库单 SL：待执行，等仓管员确认实物已出库
+        qty_total = sum(abs(d) for _, d in loss)
         order = OutboundOrder(
             no=gen_no("SL"), type=str(OutboundType.LOSS), source_no=s.no,
-            status=str(OrderStatus.DONE),
-            plan_qty=sum(abs(d) for _, d in loss),
-            actual_qty=sum(abs(d) for _, d in loss),
+            status=str(OrderStatus.PENDING),
+            plan_qty=qty_total,
+            actual_qty=qty_total,  # 数量由盘点确定，不需要再扫
             creator_id=operator_id,
-            finished_at=_NOW(),
         )
         db.add(order)
         db.flush()
         for it, d in loss:
             for _ in range(abs(d)):
                 db.add(OutboundItem(order_id=order.id, sku_id=it.material_id,
-                                    location_id=it.location_id, status="SHIPPED",
-                                    operator_id=operator_id, operated_at=_NOW()))
-        apply_many(
-            db,
-            [Move(str(SkuType.MATERIAL), it.material_id, it.location_id, d) for it, d in loss],
-            biz_type=str(BizType.STOCKTAKE_OUT), biz_no=order.no, operator_id=operator_id,
-        )
+                                    location_id=it.location_id, status="PENDING"))
         docs["loss_no"] = order.no
 
     if gain:
-        # 盘盈入库单 SG
+        # 盘盈入库单 SG：待执行
+        qty_total = sum(d for _, d in gain)
         order_in = InboundOrder(
             no=gen_no("SG"), type=str(InboundType.GAIN), source_no=s.no,
-            status=str(OrderStatus.DONE),
-            plan_qty=sum(d for _, d in gain),
-            actual_qty=sum(d for _, d in gain),
+            status=str(OrderStatus.PENDING),
+            plan_qty=qty_total,
+            actual_qty=qty_total,
             creator_id=operator_id,
-            checker_id=operator_id,
-            finished_at=_NOW(),
         )
         db.add(order_in)
         db.flush()
         for it, d in gain:
             db.add(InboundItem(order_id=order_in.id, sku_id=it.material_id,
                                qty=d, location_id=it.location_id))
-        apply_many(
-            db,
-            [Move(str(SkuType.MATERIAL), it.material_id, it.location_id, d) for it, d in gain],
-            biz_type=str(BizType.STOCKTAKE_IN), biz_no=order_in.no, operator_id=operator_id,
-        )
         docs["gain_no"] = order_in.no
 
     s.status = transit("STOCKTAKE", s.status, str(StocktakeStatus.DONE))
@@ -391,8 +379,6 @@ def submit(db: Session, sid: int, body: StocktakeSubmitReq, operator_id: int) ->
     s.diff_gain = len(gain)
     s.finished_at = _NOW()
     s.version += 1
-    if body.note:
-        s.operator_id = s.operator_id  # 备注无处存，忽略（见取舍表）
 
     # 解锁：只解锁本仓、当前为 LOCKED 的库位，按库存推回空闲/占用
     locs = db.execute(
@@ -416,4 +402,6 @@ def submit(db: Session, sid: int, body: StocktakeSubmitReq, operator_id: int) ->
         "diff_loss": s.diff_loss,
         "diff_gain": s.diff_gain,
         **docs,
+        # 单据是「待执行」的：库存要等对应单据被提交后才变
+        "docs_pending": bool(docs["loss_no"] or docs["gain_no"]),
     }
