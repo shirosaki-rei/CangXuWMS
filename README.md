@@ -53,6 +53,24 @@ EXPO_PUBLIC_API_BASE=http://<你的局域网 IP>:8000/api/v1 npx expo start
 没有 MySQL/Redis 也能跑：把 `backend/.env` 的 `DB_URL` 改成 `sqlite:///./dev.db`，
 Redis 连不上会自动退化到进程内实现（仅单进程开发可用，生产必须配真 Redis）。
 
+### 演示数据（可选）
+
+`python -m app.seed` 只造主数据与几张**待执行**单据，没有库存——因为测试会断言「初始库存为 0」。
+需要「历史已完结单据 + 库存」时单独跑：
+
+```bash
+cd backend
+PYTHONPATH=. ./.venv/Scripts/python.exe tools/seed_demo.py           # 幂等，可重复执行
+PYTHONPATH=. ./.venv/Scripts/python.exe tools/seed_demo.py --reset   # 只删本脚本造的单据与流水
+```
+
+会创建 3 张已完结入库单（PR/PI/SG，日期回溯到 7~12 天前）并写入对应库存：
+AMOLED 类物料 120、A3288 60 台、PCB 8 件。跑完 `tools/gate_check.py` 的 G2/G3 也能过。
+
+> 想要 200 件 AMOLED，不必再造单：种子里已有 `PR20260127001`（待入库，来源 JY20260127002），
+> 直接 扫码 → 上架 → 提交 即可。**从 JY20260127002 再生成一张会被拒**——
+> 它的合格数已全部计入这张 PR（`gen_inbound` 会扣减已生成量）。
+
 ### 种子账号（密码同用户名）
 
 | 账号 | 角色 | 可见仓库 |
