@@ -36,7 +36,7 @@ NOW = datetime.now(timezone.utc).replace(tzinfo=None)
 # 本脚本创建的单号前缀，--reset 只清理这些
 DEMO_INBOUND = [
     # (单号, 类型, 来源单号, 物料/产品编码, 数量, 天数前)
-    ("PR20260120001", "PURCHASE", "JY20260120001", "BAT-LIPO-4500-003", 120, 7),
+    ("PR20260120001", "PURCHASE", "JY20260120001", "DSP-AMOLED-67-FULL", 120, 7),
     ("PI20260118001", "PRODUCT", "RWD20260118001", "A3288", 60, 9),
     ("SG20260115001", "GAIN", None, "PCB-MAIN-V3", 8, 12),
 ]

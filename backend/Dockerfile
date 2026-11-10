@@ -25,6 +25,9 @@ RUN pip install --no-cache-dir -i ${PIP_INDEX_URL} -r requirements.txt
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini .
+# 演示与运维脚本（seed_demo / gate_check / push_demo）需要能在容器内跑，
+# 否则演示脚本里的 `docker compose exec api python tools/xxx.py` 会 No such file
+COPY tools ./tools
 
 # 非 root 运行
 RUN useradd -r -u 10001 wms && chown -R wms:wms /srv
