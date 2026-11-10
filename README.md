@@ -6,7 +6,7 @@ FastAPI + MySQL 8 + Redis + Vue3 单机部署。文档与代码的对应关系�
 
 | 目录 | 内容 |
 |---|---|
-| `docs/` | PRD、架构设计、接口契约、开发任务清单、**分批次执行任务表** |
+| `docs/` | PRD、架构设计、接口契约、开发任务清单、**分批次执行任务表**、验收对照表、**演示脚本** |
 | `backend/` | FastAPI 服务（api / service / domain 分层） |
 | `frontend/` | Vue3 + Vite + Element Plus + Pinia 管理端 |
 | `mobile/` | 仓储作业 APP（Expo + React Native + SQLite 离线队列） |
